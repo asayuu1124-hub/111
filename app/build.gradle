@@ -1,0 +1,15 @@
+android {
+    defaultConfig {
+        applicationId "com.asayuu.com"
+        minSdkVersion 26
+        targetSdkVersion 30
+
+        // 【版本升级配置】
+        // versionCode 必须比旧版本（1）大，系统才允许覆盖安装
+        versionCode 2
+        // versionName 是你在应用信息里看到的文字
+        versionName "1.5"
+
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+    }
+}
