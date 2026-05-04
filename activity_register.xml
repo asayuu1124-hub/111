@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#E0E5EC"
+    android:padding="30dp">
+
+    <TextView
+        android:id="@+id/tv_reg_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="40dp"
+        android:text="加入小欲˚ʚ₍ ᐢ. ̫ .ᐢ ₎ɞ˚"
+        android:textColor="#4E5D6A"
+        android:textSize="24sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tv_reg_title"
+        android:layout_marginTop="50dp"
+        android:orientation="vertical">
+
+        <EditText
+            android:id="@+id/et_reg_user"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:background="@drawable/nm_input_inset"
+            android:hint="设置用户名"
+            android:paddingLeft="20dp"
+            android:textColor="#333333" />
+
+        <EditText
+            android:id="@+id/et_reg_pass"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/nm_input_inset"
+            android:hint="设置密码"
+            android:inputType="textPassword"
+            android:paddingLeft="20dp"
+            android:textColor="#333333" />
+
+        <EditText
+            android:id="@+id/et_reg_confirm"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/nm_input_inset"
+            android:hint="确认密码"
+            android:inputType="textPassword"
+            android:paddingLeft="20dp"
+            android:textColor="#333333" />
+
+        <Button
+            android:id="@+id/btn_do_reg"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:layout_marginTop="40dp"
+            android:background="@drawable/selector_neumorph_btn"
+            android:text="完 成 注 册"
+            android:textColor="#4A90E2"
+            android:stateListAnimator="@null" />
+
+        <TextView
+            android:id="@+id/tv_back_login"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="20dp"
+            android:text="已有账号？返回登录"
+            android:textColor="#888888"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <RelativeLayout
+        android:id="@+id/loading_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/nm_loading_bg"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+        <ProgressBar
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:layout_centerInParent="true"
+            android:indeterminateTint="#4A90E2" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:layout_marginTop="70dp"
+            android:text="正在提交云端..."
+            android:textColor="#4E5D6A"
+            android:textSize="12sp" />
+    </RelativeLayout>
+
+</RelativeLayout>

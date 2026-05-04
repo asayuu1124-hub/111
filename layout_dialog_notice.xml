@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/nm_dialog_bg"
+    android:orientation="vertical"
+    android:padding="28dp">
+
+    <TextView
+        android:id="@+id/dialog_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="最 新 公 告"
+        android:textColor="#4E5D6A"
+        android:textSize="18sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/dialog_msg"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:lineSpacingExtra="5dp"
+        android:text="正在获取内容..."
+        android:textColor="#666666"
+        android:textSize="14sp" />
+
+    <Button
+        android:id="@+id/dialog_btn_ok"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginTop="25dp"
+        android:background="@drawable/selector_neumorph_btn"
+        android:text="我知道了"
+        android:textColor="#4A90E2"
+        android:stateListAnimator="@null" />
+
+    <TextView
+        android:id="@+id/dialog_btn_ignore"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:layout_marginTop="18dp"
+        android:padding="8dp"
+        android:text="近期不再提醒"
+        android:textColor="#BBBBBB"
+        android:textSize="12sp" />
+
+</LinearLayout>

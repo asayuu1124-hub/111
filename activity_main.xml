@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#EDEDED"
+    android:scrollbars="none">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="@drawable/nm_card_bg"
+            android:orientation="vertical"
+            android:padding="20dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="系统仪表盘"
+                android:textColor="#888888"
+                android:textSize="12sp" />
+            <TextView
+                android:id="@+id/tv_clock"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:text="00:00:00"
+                android:textColor="#333333"
+                android:textSize="32sp"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/tv_battery"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:text="电量监控: --%"
+                android:textColor="#666666"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/nm_card_bg"
+            android:padding="15dp">
+            <TextView
+                android:id="@+id/tv_notice_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="📢 正在同步云端公告..."
+                android:textColor="#555555"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/nm_card_bg"
+            android:padding="15dp">
+            <TextView
+                android:id="@+id/tv_clipboard_preview"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:singleLine="true"
+                android:ellipsize="end"
+                android:text="剪贴板预览: 无内容"
+                android:textColor="#999999"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="25dp"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/btn_start_float"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:layout_marginRight="10dp"
+                android:background="@drawable/selector_neumorph_btn"
+                android:text="激活悬浮窗"
+                android:textColor="#4A90E2"
+                android:stateListAnimator="@null" />
+            <Button
+                android:id="@+id/btn_to_watermark"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:background="@drawable/selector_neumorph_btn"
+                android:text="一键去水印"
+                android:textColor="#555555"
+                android:stateListAnimator="@null" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="15dp"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/btn_to_video_site"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:layout_marginRight="10dp"
+                android:background="@drawable/selector_neumorph_btn"
+                android:text="影 视 中 枢"
+                android:textColor="#4A90E2"
+                android:textStyle="bold"
+                android:stateListAnimator="@null" />
+            <Button
+                android:id="@+id/btn_to_novel_site"
+                android:layout_width="0dp"
+                android:layout_height="60dp"
+                android:layout_weight="1"
+                android:background="@drawable/selector_neumorph_btn"
+                android:text="文 墨 书 香"
+                android:textColor="#27AE60"
+                android:textStyle="bold"
+                android:stateListAnimator="@null" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="25dp"
+            android:orientation="horizontal">
+            <Button
+                android:id="@+id/btn_back_login"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                android:layout_marginRight="10dp"
+                android:background="@drawable/selector_neumorph_btn"
+                android:text="返回登录"
+                android:textColor="#888888"
+                android:textSize="13sp"
+                android:stateListAnimator="@null" />
+            <Button
+                android:id="@+id/btn_exit"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                android:background="@drawable/selector_neumorph_btn"
+                android:text="安全退出"
+                android:textColor="#E74C3C"
+                android:textSize="13sp"
+                android:stateListAnimator="@null" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="30dp"
+            android:text="小欲˚ʚ₍ ᐢ. ̫ .ᐢ ₎ɞ˚ v1.5"
+            android:textColor="#CCCCCC"
+            android:textSize="11sp" />
+
+    </LinearLayout>
+</ScrollView>

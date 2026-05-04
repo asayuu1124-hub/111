@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root_container"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/nm_button_raised"
+    android:descendantFocusability="afterDescendants">
+
+    <RelativeLayout android:id="@+id/title_bar" android:layout_width="match_parent" android:layout_height="45dp">
+        <View android:id="@+id/btn_drag" android:layout_width="40dp" android:layout_height="40dp" android:layout_margin="2dp" android:background="@android:drawable/ic_menu_compass" />
+        <LinearLayout android:layout_width="wrap_content" android:layout_height="match_parent" android:layout_alignParentRight="true">
+            <TextView android:id="@+id/btn_minimize" android:layout_width="45dp" android:layout_height="match_parent" android:gravity="center" android:text="—" android:textColor="#4E5D6A" android:textSize="18sp" android:clickable="true" />
+            <TextView android:id="@+id/btn_close" android:layout_width="45dp" android:layout_height="match_parent" android:gravity="center" android:text="✕" android:textColor="#E74C3C" android:textSize="18sp" android:clickable="true" />
+        </LinearLayout>
+    </RelativeLayout>
+
+    <LinearLayout android:id="@+id/sidebar" android:layout_width="95dp" android:layout_height="match_parent" android:layout_below="@id/title_bar" android:orientation="vertical">
+        <TextView android:id="@+id/menu_translate" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="15dp" android:text="快捷翻译" android:textColor="#4E5D6A" android:clickable="true" />
+        <TextView android:id="@+id/menu_pending" android:layout_width="match_parent" android:layout_height="wrap_content" android:padding="15dp" android:text="待定" android:textColor="#4E5D6A" android:clickable="true" />
+    </LinearLayout>
+
+    <LinearLayout android:id="@+id/ll_trans_card" android:layout_width="match_parent" android:layout_height="match_parent" android:layout_below="@id/title_bar" android:layout_toRightOf="@id/sidebar" android:layout_margin="8dp" android:background="@drawable/bg_neumorph_trans_card" android:orientation="vertical" android:padding="8dp" android:visibility="gone">
+        <RelativeLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="3dp">
+            <TextView android:id="@+id/tv_mode_toggle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="被动模式: ON" android:textColor="#4E5D6A" android:textSize="9sp" android:clickable="true" />
+            <ImageView android:id="@+id/iv_copy_trans" android:layout_width="22dp" android:layout_height="22dp" android:layout_alignParentRight="true" android:src="@android:drawable/ic_menu_save" android:visibility="gone" />
+        </RelativeLayout>
+        <EditText android:id="@+id/et_trans_input" android:layout_width="match_parent" android:layout_height="40dp" android:background="@drawable/bg_neumorph_edit_inset" android:hint="点此输入并回车..." android:paddingLeft="10dp" android:textColor="#333333" android:textSize="12sp" android:singleLine="true" android:imeOptions="actionSearch" android:inputType="text" android:shadowColor="#CC000000" android:shadowRadius="3" />
+        <TextView android:id="@+id/tv_trans_result" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="5dp" android:background="@drawable/bg_neumorph_edit_inset" android:padding="8dp" android:text="等待剪贴板内容..." android:textColor="#333333" android:textSize="13sp" android:shadowColor="#CC000000" android:shadowDx="1.5" android:shadowDy="1.5" android:shadowRadius="5" />
+        <SeekBar android:id="@+id/sb_trans_alpha" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:max="255" android:progress="255" />
+    </LinearLayout>
+
+    <View android:id="@+id/btn_resize" android:layout_width="45dp" android:layout_height="45dp" android:layout_alignParentRight="true" android:layout_alignParentBottom="true" android:background="@android:drawable/ic_menu_help" />
+</RelativeLayout>

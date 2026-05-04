@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#E0E5EC"
+    android:padding="30dp">
+
+    <TextView
+        android:id="@+id/tv_logo"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="50dp"
+        android:text="小欲˚ʚ₍ ᐢ. ̫ .ᐢ ₎ɞ˚"
+        android:textColor="#4E5D6A"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:shadowColor="#CCFFFFFF"
+        android:shadowDx="-2"
+        android:shadowDy="-2"
+        android:shadowRadius="3" />
+
+    <LinearLayout
+        android:id="@+id/login_form"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tv_logo"
+        android:layout_marginTop="50dp"
+        android:orientation="vertical">
+
+        <EditText
+            android:id="@+id/et_login_user"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:background="@drawable/nm_input_inset"
+            android:hint="用户名"
+            android:paddingLeft="20dp"
+            android:textColor="#333333" />
+
+        <EditText
+            android:id="@+id/et_login_pass"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:layout_marginTop="20dp"
+            android:background="@drawable/nm_input_inset"
+            android:hint="密码"
+            android:inputType="textPassword"
+            android:paddingLeft="20dp"
+            android:textColor="#333333" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="15dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+            <CheckBox android:id="@+id/cb_remember" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="记住密码" android:textColor="#888888" android:textSize="12sp" />
+            <CheckBox android:id="@+id/cb_auto_login" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginLeft="20dp" android:text="自动登录" android:textColor="#888888" android:textSize="12sp" />
+        </LinearLayout>
+
+        <Button
+            android:id="@+id/btn_do_login"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:layout_marginTop="30dp"
+            android:background="@drawable/selector_neumorph_btn"
+            android:text="即 刻 启 动"
+            android:textColor="#4A90E2"
+            android:stateListAnimator="@null" />
+
+        <TextView
+            android:id="@+id/tv_go_register"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="20dp"
+            android:text="还没有账号？点击注册"
+            android:textColor="#888888"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <RelativeLayout
+        android:id="@+id/loading_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/nm_loading_bg"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+        <ProgressBar
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:layout_centerInParent="true"
+            android:indeterminateTint="#4A90E2" />
+        <TextView
+            android:id="@+id/tv_loading_msg"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:layout_marginTop="70dp"
+            android:text="正在连接云端..."
+            android:textColor="#4E5D6A"
+            android:textSize="12sp" />
+    </RelativeLayout>
+
+</RelativeLayout>

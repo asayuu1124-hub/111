@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#E0E5EC</color>
+    <color name="colorPrimaryDark">#A3B1C6</color>
+    <color name="colorAccent">#4A90E2</color>
+
+    <color name="nm_bg">#E0E5EC</color>
+    <color name="nm_light_shadow">#FFFFFF</color>
+    <color name="nm_dark_shadow">#A3B1C6</color>
+    <color name="nm_text_main">#4E5D6A</color>
+    <color name="nm_accent_blue">#4A90E2</color>
+    <color name="nm_danger">#E74C3C</color>
+</resources>

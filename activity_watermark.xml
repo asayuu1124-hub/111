@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#E0E5EC"
+    android:padding="20dp">
+
+    <LinearLayout
+        android:id="@+id/ll_header"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/nm_card_raised"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="15dp">
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="小欲˚ʚ₍ ᐢ. ̫ .ᐢ ₎ɞ˚"
+            android:textColor="#4E5D6A"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+        <View android:layout_width="1dp" android:layout_height="15dp" android:layout_marginHorizontal="10dp" android:background="#D0D0D0" />
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="高级视频控制版"
+            android:textColor="#888888"
+            android:textSize="12sp" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/ll_input_card"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/ll_header"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/nm_input_inset"
+        android:orientation="vertical"
+        android:padding="15dp">
+
+        <EditText
+            android:id="@+id/et_url"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:background="@null"
+            android:hint="粘贴链接至此..."
+            android:paddingLeft="10dp"
+            android:textColor="#333333"
+            android:textSize="14sp" />
+
+        <Button
+            android:id="@+id/btn_parse"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/selector_neumorph_btn"
+            android:text="开 始 解析"
+            android:textColor="#4A90E2"
+            android:stateListAnimator="@null" />
+    </LinearLayout>
+
+    <RelativeLayout
+        android:id="@+id/preview_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/ll_input_card"
+        android:layout_above="@+id/download_console"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="20dp"
+        android:background="@drawable/nm_card_raised"
+        android:padding="12dp">
+
+        <TextView
+            android:id="@+id/tv_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="10dp"
+            android:text="预览窗口"
+            android:textColor="#4E5D6A"
+            android:textSize="13sp" />
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_below="@id/tv_title"
+            android:background="@drawable/nm_input_inset">
+            
+            <VideoView
+                android:id="@+id/video_view"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:visibility="gone" />
+
+            <RelativeLayout
+                android:id="@+id/video_control_layout"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_gravity="bottom"
+                android:background="#99000000" 
+                android:paddingHorizontal="10dp"
+                android:visibility="gone">
+
+                <ImageButton
+                    android:id="@+id/btn_video_play"
+                    android:layout_width="35dp"
+                    android:layout_height="35dp"
+                    android:layout_centerVertical="true"
+                    android:background="@drawable/selector_neumorph_btn"
+                    android:src="@android:drawable/ic_media_pause"
+                    android:padding="6dp"
+                    android:scaleType="centerInside" />
+
+                <ImageButton
+                    android:id="@+id/btn_video_fullscreen"
+                    android:layout_width="35dp"
+                    android:layout_height="35dp"
+                    android:layout_alignParentRight="true"
+                    android:layout_centerVertical="true"
+                    android:background="@drawable/selector_neumorph_btn"
+                    android:src="@android:drawable/ic_menu_zoom"
+                    android:padding="6dp"
+                    android:scaleType="centerInside" />
+
+                <SeekBar
+                    android:id="@+id/video_seekbar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_centerVertical="true"
+                    android:layout_toRightOf="@id/btn_video_play"
+                    android:layout_toLeftOf="@id/btn_video_fullscreen"
+                    android:layout_marginHorizontal="5dp"
+                    android:progressTint="#4A90E2"
+                    android:thumbTint="#4A90E2" />
+            </RelativeLayout>
+
+            <ImageView
+                android:id="@+id/image_preview"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_gravity="center"
+                android:scaleType="centerInside"
+                android:visibility="gone" />
+
+            <RelativeLayout
+                android:id="@+id/loading_layout"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:visibility="gone">
+                <ProgressBar
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:indeterminateTint="#4A90E2" />
+            </RelativeLayout>
+        </FrameLayout>
+
+        <TextView
+            android:id="@+id/tv_image_index"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentBottom="true"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="15dp"
+            android:background="@drawable/nm_card_inset"
+            android:paddingHorizontal="12dp"
+            android:paddingVertical="4dp"
+            android:textColor="#888888"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/tv_swipe_hint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_above="@id/tv_image_index"
+            android:layout_centerHorizontal="true"
+            android:layout_marginBottom="5dp"
+            android:text="左右滑动切换图片"
+            android:textColor="#BBBBBB"
+            android:textSize="10sp"
+            android:visibility="gone" />
+    </RelativeLayout>
+
+    <LinearLayout
+        android:id="@+id/download_console"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="10dp"
+        android:background="@drawable/nm_card_raised"
+        android:orientation="vertical"
+        android:padding="15dp"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/btn_download_video"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:background="@drawable/selector_neumorph_btn"
+            android:text="保存无水印视频"
+            android:textColor="#4A90E2"
+            android:textStyle="bold"
+            android:stateListAnimator="@null"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/ll_image_download"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:visibility="gone">
+            <Button
+                android:id="@+id/btn_download_current"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                android:layout_marginRight="10dp"
+                android:background="@drawable/selector_neumorph_btn"
+                android:text="保存当前图"
+                android:textColor="#555555"
+                android:textSize="12sp"
+                android:stateListAnimator="@null" />
+            <Button
+                android:id="@+id/btn_download_all"
+                android:layout_width="0dp"
+                android:layout_height="50dp"
+                android:layout_weight="1"
+                android:background="@drawable/selector_neumorph_btn"
+                android:text="保存全集"
+                android:textColor="#555555"
+                android:textSize="12sp"
+                android:stateListAnimator="@null" />
+        </LinearLayout>
+    </LinearLayout>
+</RelativeLayout>
