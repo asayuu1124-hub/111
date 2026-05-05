@@ -45,40 +45,10 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="30dp"
-            android:text="🌟 免费神站"
+            android:text="🌟 推荐神站"
             android:textColor="#4E5D6A"
             android:textSize="14sp"
             android:textStyle="bold" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="horizontal">
-            <Button
-                android:id="@+id/btn_novel_shuqu"
-                android:layout_width="0dp"
-                android:layout_height="50dp"
-                android:layout_weight="1"
-                android:layout_marginRight="12dp"
-                android:background="@drawable/selector_neumorph_btn"
-                android:text="书趣阁"
-                android:singleLine="true"
-                android:textColor="#555555"
-                android:textSize="11sp"
-                android:stateListAnimator="@null" />
-            <Button
-                android:id="@+id/btn_novel_bqg"
-                android:layout_width="0dp"
-                android:layout_height="50dp"
-                android:layout_weight="1"
-                android:background="@drawable/selector_neumorph_btn"
-                android:text="新笔趣阁"
-                android:singleLine="true"
-                android:textColor="#555555"
-                android:textSize="11sp"
-                android:stateListAnimator="@null" />
-        </LinearLayout>
 
         <Button
             android:id="@+id/btn_novel_520"
@@ -86,7 +56,7 @@
             android:layout_height="50dp"
             android:layout_marginTop="12dp"
             android:background="@drawable/selector_neumorph_btn"
-            android:text="520BOOK (无广告版)"
+            android:text="520BOOK (无广告纯净版)"
             android:singleLine="true"
             android:textColor="#555555"
             android:textSize="12sp"

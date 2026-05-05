@@ -6,9 +6,9 @@ android {
 
         // 【版本升级配置】
         // versionCode 必须比旧版本（1）大，系统才允许覆盖安装
-        versionCode 2
+        versionCode 3
         // versionName 是你在应用信息里看到的文字
-        versionName "1.5"
+        versionName "2.0"
 
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }

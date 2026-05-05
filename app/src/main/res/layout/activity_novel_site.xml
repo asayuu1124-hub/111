@@ -1,19 +1,121 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F5F5">
+    android:background="#EDEDED">
 
-    <WebView
-        android:id="@+id/novel_webview"
+    <LinearLayout
+        android:id="@+id/novel_webview_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+        
+        <ProgressBar
+            android:id="@+id/novel_loader"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:max="100"
+            android:progressDrawable="@drawable/nm_loading_bg" />
+            
+        <WebView
+            android:id="@+id/novel_webview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </LinearLayout>
 
-    <ProgressBar
-        android:id="@+id/novel_loader"
-        style="?android:attr/progressBarStyleHorizontal"
+    <Button
+        android:id="@+id/btn_start_immersive"
+        android:layout_width="wrap_content"
+        android:layout_height="45dp"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentRight="true"
+        android:layout_margin="20dp"
+        android:background="@drawable/selector_neumorph_btn"
+        android:paddingLeft="15dp"
+        android:paddingRight="15dp"
+        android:text="📖 沉浸阅读"
+        android:textColor="#27AE60"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        android:stateListAnimator="@null" />
+
+    <RelativeLayout
+        android:id="@+id/layout_immersive_reader"
         android:layout_width="match_parent"
-        android:layout_height="3dp"
-        android:progressTint="#27AE60"
-        android:visibility="gone" />
-</FrameLayout>
+        android:layout_height="match_parent"
+        android:background="#F4ECD8"
+        android:visibility="gone">
+
+        <ScrollView
+            android:id="@+id/scroll_reader"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_above="@+id/reader_controls"
+            android:padding="20dp"
+            android:scrollbars="none">
+            
+            <TextView
+                android:id="@+id/tv_reader_content"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#333333"
+                android:textSize="18sp"
+                android:lineSpacingExtra="10dp" />
+        </ScrollView>
+
+        <LinearLayout
+            android:id="@+id/reader_controls"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_alignParentBottom="true"
+            android:background="#E6DCC3"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:paddingLeft="10dp"
+            android:paddingRight="10dp">
+            
+            <Button
+                android:id="@+id/btn_reader_font_minus"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="A-"
+                android:textColor="#555555"
+                android:textSize="16sp"
+                android:background="@android:color/transparent" />
+                
+            <Button
+                android:id="@+id/btn_reader_font_plus"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="A+"
+                android:textColor="#555555"
+                android:textSize="16sp"
+                android:background="@android:color/transparent" />
+                
+            <Button
+                android:id="@+id/btn_reader_theme"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="🌙 护眼"
+                android:textColor="#555555"
+                android:textSize="14sp"
+                android:background="@android:color/transparent" />
+                
+            <Button
+                android:id="@+id/btn_reader_exit"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:text="退出"
+                android:textColor="#E74C3C"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:background="@android:color/transparent" />
+        </LinearLayout>
+    </RelativeLayout>
+</RelativeLayout>

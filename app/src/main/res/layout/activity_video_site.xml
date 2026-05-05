@@ -1,25 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000">
+    android:background="#EDEDED">
 
     <LinearLayout
         android:id="@+id/layout_webview_container"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical">
+        
+        <ProgressBar
+            android:id="@+id/video_loader"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="4dp"
+            android:max="100"
+            android:progressDrawable="@drawable/nm_loading_bg" />
+
         <WebView
             android:id="@+id/video_webview"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
     </LinearLayout>
 
-    <ProgressBar
-        android:id="@+id/video_loader"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="match_parent"
-        android:layout_height="3dp"
-        android:progressTint="#4A90E2"
-        android:visibility="gone" />
-</FrameLayout>
+    <Button
+        android:id="@+id/btn_sniff_result"
+        android:layout_width="wrap_content"
+        android:layout_height="45dp"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentRight="true"
+        android:layout_margin="20dp"
+        android:background="@drawable/selector_neumorph_btn"
+        android:paddingLeft="15dp"
+        android:paddingRight="15dp"
+        android:text="🎬 发 现 直 链"
+        android:textColor="#E74C3C"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:visibility="gone"
+        android:stateListAnimator="@null" />
+
+</RelativeLayout>

@@ -32,14 +32,48 @@
                 android:textColor="#333333"
                 android:textSize="32sp"
                 android:textStyle="bold" />
+            
             <TextView
                 android:id="@+id/tv_battery"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="5dp"
-                android:text="电量监控: --%"
+                android:text="电量监控: --% | 状态: --"
                 android:textColor="#666666"
                 android:textSize="13sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="15dp"
+                android:orientation="vertical">
+                
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:text="CPU 使用率" android:textSize="10sp" android:textColor="#999999"/>
+                <ProgressBar android:id="@+id/pb_cpu" style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent" android:layout_height="8dp" android:max="100" />
+                
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp" android:text="RAM 占用率" android:textSize="10sp" android:textColor="#999999"/>
+                <ProgressBar android:id="@+id/pb_ram" style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent" android:layout_height="8dp" android:max="100" />
+                
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp" android:text="ROM 剩余空间" android:textSize="10sp" android:textColor="#999999"/>
+                <ProgressBar android:id="@+id/pb_rom" style="?android:attr/progressBarStyleHorizontal"
+                    android:layout_width="match_parent" android:layout_height="8dp" android:max="100" />
+
+                <TextView
+                    android:id="@+id/tv_net_speed"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="网络测速: ↓ 0 KB/s | ↑ 0 KB/s"
+                    android:textColor="#4A90E2"
+                    android:textSize="11sp"
+                    android:gravity="center"
+                    android:textStyle="bold"/>
+            </LinearLayout>
         </LinearLayout>
 
         <LinearLayout
@@ -58,6 +92,7 @@
         </LinearLayout>
 
         <LinearLayout
+            android:id="@+id/layout_clip_history"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
@@ -69,8 +104,8 @@
                 android:layout_height="wrap_content"
                 android:singleLine="true"
                 android:ellipsize="end"
-                android:text="剪贴板预览: 无内容"
-                android:textColor="#999999"
+                android:text="剪贴板预览: 点击查看历史记录"
+                android:textColor="#4A90E2"
                 android:textSize="12sp" />
         </LinearLayout>
 
@@ -128,6 +163,29 @@
                 android:stateListAnimator="@null" />
         </LinearLayout>
 
+        <Button
+            android:id="@+id/btn_to_app_manager"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:layout_marginTop="15dp"
+            android:background="@drawable/selector_neumorph_btn"
+            android:text="📦 立 方 应 用 提 取 器"
+            android:textColor="#555555"
+            android:textSize="13sp"
+            android:stateListAnimator="@null" />
+            
+        <Button
+            android:id="@+id/btn_to_safebox"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:layout_marginTop="15dp"
+            android:background="@drawable/selector_neumorph_btn"
+            android:text="🔒 私 密 暗 盒"
+            android:textColor="#8E44AD"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:stateListAnimator="@null" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -161,9 +219,8 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:layout_marginTop="30dp"
-            android:text="小欲˚ʚ₍ ᐢ. ̫ .ᐢ ₎ɞ˚ v1.5"
+            android:text="小欲˚ʚ₍ ᐢ. ̫ .ᐢ ₎ɞ˚ v2.0"
             android:textColor="#CCCCCC"
             android:textSize="11sp" />
-
     </LinearLayout>
 </ScrollView>

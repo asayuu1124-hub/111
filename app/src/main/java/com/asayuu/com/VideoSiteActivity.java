@@ -1,8 +1,14 @@
 package com.asayuu.com;
 
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.res.Configuration;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.View;
@@ -10,6 +16,7 @@ import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.webkit.*;
+import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
@@ -21,15 +28,14 @@ public class VideoSiteActivity extends Activity {
     private WebView webView;
     private ProgressBar loader;
     private LinearLayout webViewLayout;
+    private Button btnSniff;
     
     private View customView;
     private WebChromeClient.CustomViewCallback customViewCallback;
     private FrameLayout decorView;
 
-    // 🛡️ 极其精简的黑名单（只拦广告域名，不搜关键字，防止误杀）
-    private String[] adBlacklist = {
-        "union.baidu.com", "ads.", "guanggao", "popunder", "poker", "casino", "bet66"
-    };
+    private String sniffedUrl = "";
+    private String[] adBlacklist = { "union.baidu.com", "ads.", "guanggao", "popunder", "poker", "casino", "bet66" };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,26 +47,31 @@ public class VideoSiteActivity extends Activity {
         loader = (ProgressBar) findViewById(R.id.video_loader);
         webViewLayout = (LinearLayout) findViewById(R.id.layout_webview_container);
         decorView = (FrameLayout) getWindow().getDecorView();
+        
+        btnSniff = (Button) findViewById(R.id.btn_sniff_result);
 
-        // 🛠️ 核心：启动时彻底清除缓存，防止加载之前出错的源码页面
         webView.clearCache(true);
         webView.clearHistory();
 
         initSettings();
         
         String url = getIntent().getStringExtra("target_url");
-        if (url == null || url.isEmpty()) {
-            url = "https://m.v.qq.com/";
-        }
+        if (url == null || url.isEmpty()) url = "https://m.v.qq.com/";
         webView.loadUrl(url);
 
         webView.setOnLongClickListener(new View.OnLongClickListener() {
-            @Override
-            public boolean onLongClick(View v) {
+            @Override public boolean onLongClick(View v) {
                 Toast.makeText(VideoSiteActivity.this, "深度重载中...", Toast.LENGTH_SHORT).show();
                 webView.clearCache(true);
                 webView.reload();
                 return true;
+            }
+        });
+
+        // 模块三：嗅探按钮点击事件
+        btnSniff.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (!sniffedUrl.isEmpty()) showSniffDialog(sniffedUrl);
             }
         });
     }
@@ -73,11 +84,7 @@ public class VideoSiteActivity extends Activity {
         s.setUseWideViewPort(true);
         s.setLoadWithOverviewMode(true);
         s.setAllowFileAccess(true);
-        
-        // 🛠️ 核心：禁用缓存模式，强制从网络获取，解决“回退变源码”的问题
         s.setCacheMode(WebSettings.LOAD_NO_CACHE);
-        
-        // 🎭 使用非常标准的移动端 UA
         s.setUserAgentString("Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Mobile Safari/537.36");
 
         if (android.os.Build.VERSION.SDK_INT >= 21) {
@@ -85,19 +92,29 @@ public class VideoSiteActivity extends Activity {
         }
 
         webView.setWebViewClient(new WebViewClient() {
-            
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, String url) {
                 String u = url.toLowerCase();
                 
-                // 🛡️ 核心：白名单极速放行
-                // 只要 URL 包含网站主域名，或者包含视频/样式特征，直接返回 null（让系统正常加载）
-                if (u.contains("fdzys.com") || u.contains("huazidm.com") || u.contains("skr2.cc") || 
-                    u.contains(".m3u8") || u.contains(".ts") || u.contains(".mp4") || u.contains("video")) {
+                // 模块三：嗅探核心逻辑
+                if (u.contains(".m3u8") || u.contains(".mp4")) {
+                    final String detectedUrl = url;
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            if (sniffedUrl.isEmpty() || !sniffedUrl.equals(detectedUrl)) {
+                                sniffedUrl = detectedUrl;
+                                btnSniff.setVisibility(View.VISIBLE);
+                            }
+                        }
+                    });
                     return null; 
                 }
 
-                // 只拦截纯广告黑名单
+                if (u.contains("fdzys.com") || u.contains("huazidm.com") || u.contains("skr2.cc") || 
+                    u.contains(".ts") || u.contains("video")) {
+                    return null; 
+                }
+
                 for (int i = 0; i < adBlacklist.length; i++) {
                     if (u.contains(adBlacklist[i])) {
                         return new WebResourceResponse("text/plain", "UTF-8", new ByteArrayInputStream("".getBytes()));
@@ -114,11 +131,7 @@ public class VideoSiteActivity extends Activity {
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                // 处理所有 http/https 链接在内部打开
-                if (url.startsWith("http")) {
-                    view.loadUrl(url);
-                    return true;
-                }
+                if (url.startsWith("http")) { view.loadUrl(url); return true; }
                 return false; 
             }
         });
@@ -127,18 +140,12 @@ public class VideoSiteActivity extends Activity {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
                 if (newProgress == 100) loader.setVisibility(View.GONE);
-                else {
-                    loader.setVisibility(View.VISIBLE);
-                    loader.setProgress(newProgress);
-                }
+                else { loader.setVisibility(View.VISIBLE); loader.setProgress(newProgress); }
             }
 
             @Override
             public void onShowCustomView(View view, WebChromeClient.CustomViewCallback callback) {
-                if (customView != null) {
-                    callback.onCustomViewHidden();
-                    return;
-                }
+                if (customView != null) { callback.onCustomViewHidden(); return; }
                 customView = view;
                 customViewCallback = callback;
                 webViewLayout.setVisibility(View.GONE);
@@ -160,6 +167,38 @@ public class VideoSiteActivity extends Activity {
         });
     }
 
+    private void showSniffDialog(final String url) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("✅ 发现无广告视频直链");
+        builder.setMessage("地址：\n" + url);
+        builder.setPositiveButton("外部播放", new DialogInterface.OnClickListener() {
+            @Override public void onClick(DialogInterface dialog, int which) {
+                try {
+                    Intent intent = new Intent(Intent.ACTION_VIEW);
+                    intent.setDataAndType(Uri.parse(url), "video/*");
+                    startActivity(intent);
+                } catch (Exception e) {
+                    Toast.makeText(VideoSiteActivity.this, "未找到支持的播放器", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+        builder.setNegativeButton("复制链接", new DialogInterface.OnClickListener() {
+            @Override public void onClick(DialogInterface dialog, int which) {
+                ((ClipboardManager) getSystemService(CLIPBOARD_SERVICE)).setPrimaryClip(ClipData.newPlainText("video_url", url));
+                Toast.makeText(VideoSiteActivity.this, "已复制到剪贴板", Toast.LENGTH_SHORT).show();
+            }
+        });
+        AlertDialog dialog = builder.create();
+        dialog.show();
+        
+        Window window = dialog.getWindow();
+        if (window != null) {
+            WindowManager.LayoutParams lp = window.getAttributes();
+            lp.width = (int) (getResources().getDisplayMetrics().widthPixels * 0.9);
+            window.setAttributes(lp);
+        }
+    }
+
     private void injectCleanerJs(WebView view) {
         String js = "javascript:(function() {" +
                     "   var style = document.createElement('style');" +
@@ -170,21 +209,13 @@ public class VideoSiteActivity extends Activity {
     }
 
     @Override
-    public void onConfigurationChanged(Configuration newConfig) {
-        super.onConfigurationChanged(newConfig);
-    }
+    public void onConfigurationChanged(Configuration newConfig) { super.onConfigurationChanged(newConfig); }
 
     @Override
     public boolean onKeyDown(int keyCode, KeyEvent event) {
         if (keyCode == KeyEvent.KEYCODE_BACK) {
-            if (customView != null) {
-                webView.getWebChromeClient().onHideCustomView();
-                return true;
-            }
-            if (webView.canGoBack()) {
-                webView.goBack();
-                return true;
-            }
+            if (customView != null) { webView.getWebChromeClient().onHideCustomView(); return true; }
+            if (webView.canGoBack()) { webView.goBack(); return true; }
         }
         return super.onKeyDown(keyCode, event);
     }

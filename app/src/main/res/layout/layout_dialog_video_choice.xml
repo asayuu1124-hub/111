@@ -110,18 +110,6 @@
                 android:stateListAnimator="@null" />
         </LinearLayout>
 
-        <Button
-            android:id="@+id/btn_site_huoche"
-            android:layout_width="match_parent"
-            android:layout_height="50dp"
-            android:layout_marginTop="12dp"
-            android:background="@drawable/selector_neumorph_btn"
-            android:text="火 车 太 堵 影 视"
-            android:singleLine="true"
-            android:textColor="#555555"
-            android:textSize="12sp"
-            android:stateListAnimator="@null" />
-
         <TextView
             android:id="@+id/btn_close_choice"
             android:layout_width="wrap_content"
