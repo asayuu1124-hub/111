@@ -3,6 +3,9 @@ package com.asayuu.com;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.Dialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -305,7 +308,7 @@ public class SafeBoxActivity extends Activity {
         }
     }
 
-    private void showNoteContentDialog(String title, String content) {
+    private void showNoteContentDialog(final String title, final String content) {
         final Dialog dialog = new Dialog(this);
         LinearLayout layout = new LinearLayout(this);
         layout.setOrientation(LinearLayout.VERTICAL);
@@ -331,17 +334,44 @@ public class SafeBoxActivity extends Activity {
         
         layout.addView(scroll, scrollLp);
 
+        // 新增的水平按鈕列：一鍵複製與閱畢
+        LinearLayout btnLayout = new LinearLayout(this);
+        btnLayout.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams btnLayoutLp = new LinearLayout.LayoutParams(-1, 150);
+        btnLayoutLp.topMargin = 40;
+
+        Button btnCopy = new Button(this);
+        btnCopy.setText("複 製");
+        btnCopy.setBackgroundResource(R.drawable.selector_neumorph_btn);
+        btnCopy.setTextColor(0xFF4A90E2);
+        LinearLayout.LayoutParams copyLp = new LinearLayout.LayoutParams(0, -1, 1.0f);
+        copyLp.rightMargin = 15;
+        btnLayout.addView(btnCopy, copyLp);
+
         Button btnClose = new Button(this);
         btnClose.setText("閱 畢");
         btnClose.setBackgroundResource(R.drawable.selector_neumorph_btn);
         btnClose.setTextColor(0xFF888888);
-        LinearLayout.LayoutParams lp3 = new LinearLayout.LayoutParams(-1, 150);
-        lp3.topMargin = 40;
-        layout.addView(btnClose, lp3);
+        LinearLayout.LayoutParams closeLp = new LinearLayout.LayoutParams(0, -1, 1.0f);
+        btnLayout.addView(btnClose, closeLp);
+
+        layout.addView(btnLayout, btnLayoutLp);
 
         dialog.setContentView(layout);
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        
+        // 剪貼簿邏輯注入
+        btnCopy.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                cb.setPrimaryClip(ClipData.newPlainText(title, content));
+                Toast.makeText(SafeBoxActivity.this, "內容已安全複製", Toast.LENGTH_SHORT).show();
+            }
+        });
+        
         btnClose.setOnClickListener(new View.OnClickListener() { @Override public void onClick(View v) { dialog.dismiss(); } });
+        
         dialog.show();
         resizeDialog(dialog);
     }

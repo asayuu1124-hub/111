@@ -43,6 +43,11 @@ public class FloatingService extends Service {
     private int batteryLevel = -1;
     private float batteryTemp = -1;
 
+    // --- 主動告警狀態機 ---
+    private boolean isTempWarned = false;
+    private boolean isLowBatteryWarned = false;
+    private boolean isFullBatteryWarned = false;
+
     // --- Counter Matrix Data ---
     private final String[] CARD_NAMES = {"大王", "小王", "2", "A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3"};
     private final int[] MAX_COUNTS = {1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
@@ -61,6 +66,38 @@ public class FloatingService extends Service {
             if (temp != -1) {
                 batteryTemp = temp / 10.0f;
             }
+
+            // 物理探針主動告警系統
+            try {
+                Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                
+                // 溫控警告 (≥ 42°C)
+                if (batteryTemp >= 42.0f && !isTempWarned) {
+                    isTempWarned = true;
+                    if (vibrator != null) vibrator.vibrate(new long[]{0, 500, 200, 500}, -1);
+                    Toast.makeText(context, "⚠️ 警告：設備溫度過高 (" + batteryTemp + "°C)", Toast.LENGTH_LONG).show();
+                } else if (batteryTemp < 40.0f) {
+                    isTempWarned = false; // 降溫後重置
+                }
+
+                // 低電量警告 (≤ 15%)
+                if (batteryLevel <= 15 && !isLowBatteryWarned) {
+                    isLowBatteryWarned = true;
+                    if (vibrator != null) vibrator.vibrate(new long[]{0, 300, 100, 300}, -1);
+                    Toast.makeText(context, "⚠️ 警告：電量極低 (" + batteryLevel + "%)", Toast.LENGTH_LONG).show();
+                } else if (batteryLevel > 20) {
+                    isLowBatteryWarned = false; // 充電後重置
+                }
+
+                // 滿電提醒
+                if (batteryLevel == 100 && !isFullBatteryWarned) {
+                    isFullBatteryWarned = true;
+                    if (vibrator != null) vibrator.vibrate(500);
+                    Toast.makeText(context, "✅ 提示：電池已充滿，請及時拔下電源", Toast.LENGTH_SHORT).show();
+                } else if (batteryLevel < 95) {
+                    isFullBatteryWarned = false;
+                }
+            } catch (Exception e) {}
         }
     };
 
@@ -107,13 +144,11 @@ public class FloatingService extends Service {
 
     private void initParams() {
         int type = (Build.VERSION.SDK_INT >= 26) ? 2038 : 2002;
-        // 核心修复：初始赋予悬浮球包裹内容的属性，防止小球被撑大至 600x500
         params = new WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.WRAP_CONTENT,
             type, WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE, PixelFormat.TRANSLUCENT);
         params.gravity = Gravity.TOP | Gravity.START;
         params.x = 200; params.y = 200;
-        // 保持平移模式，为后续大窗口弹出键盘做防御准备
         params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN;
     }
 
@@ -292,7 +327,6 @@ public class FloatingService extends Service {
                 isMonitorActive = false;
                 params.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
                 windowManager.removeView(windowView);
-                // 缩小回悬浮球时，严格恢复包裹内容属性
                 params.width=WindowManager.LayoutParams.WRAP_CONTENT; 
                 params.height=WindowManager.LayoutParams.WRAP_CONTENT;
                 windowManager.addView(ballView, params);
@@ -416,7 +450,7 @@ public class FloatingService extends Service {
     }
 
     private void switchTab(boolean showTrans, boolean showShield, boolean showMonitor, boolean showCounter) {
-        setWindowFocusable(false); // 切换选项卡强制退焦
+        setWindowFocusable(false); 
         llTransCard.setVisibility(showTrans ? View.VISIBLE : View.GONE);
         llShieldCard.setVisibility(showShield ? View.VISIBLE : View.GONE);
         llMonitorCard.setVisibility(showMonitor ? View.VISIBLE : View.GONE);
@@ -482,6 +516,12 @@ public class FloatingService extends Service {
 
         if (batteryLevel != -1) {
             tvBattery.setText("电池状态: " + batteryLevel + "% | 温度: " + batteryTemp + "°C");
+            // 動態告警 UI 變色
+            if (batteryTemp >= 42.0f || batteryLevel <= 15) {
+                tvBattery.setTextColor(0xFFE74C3C); // 警示紅
+            } else {
+                tvBattery.setTextColor(0xFF4E5D6A); // 原色
+            }
         }
 
         try {
@@ -513,7 +553,7 @@ public class FloatingService extends Service {
         public TouchListener(boolean b) { isB=b; }
         @Override public boolean onTouch(View v, MotionEvent e) {
             if (e.getAction()==MotionEvent.ACTION_DOWN) { 
-                if (!isB) setWindowFocusable(false); // 拖拽时强制退焦
+                if (!isB) setWindowFocusable(false);
                 iX=params.x; iY=params.y; itX=e.getRawX(); itY=e.getRawY(); return true; 
             }
             if (e.getAction()==MotionEvent.ACTION_MOVE) {
@@ -523,9 +563,8 @@ public class FloatingService extends Service {
             }
             if (isB && e.getAction()==MotionEvent.ACTION_UP && Math.abs(e.getRawX()-itX)<10) {
                 windowManager.removeView(ballView);
-                // 核心修复：点击小球展开为大窗口时，强行赋予绝对坐标物理锁死
                 params.width=mWidth; params.height=mHeight; 
-                params.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE; // 展开时保持安全闭锁状态
+                params.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
                 windowManager.addView(windowView, params);
             }
             return true;

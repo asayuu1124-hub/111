@@ -17,7 +17,7 @@ import java.util.*;
 public class MainActivity extends Activity {
     private TextView tvClock, tvBattery, tvClipboard, tvNotice, tvNetSpeed;
     private ProgressBar pbCpu, pbRam, pbRom;
-    private Button btnStartFloat, btnToWatermark, btnBackLogin, btnExit, btnToVideoSite, btnToNovelSite, btnToAppManager, btnToSafeBox;
+    private Button btnStartFloat, btnToWatermark, btnBackLogin, btnExit, btnToVideoSite, btnToNovelSite, btnToAppManager, btnToSafeBox, btnToTextGen;
     
     private Handler handler = new Handler(Looper.getMainLooper());
     private Runnable timer;
@@ -61,6 +61,7 @@ public class MainActivity extends Activity {
         btnToNovelSite = (Button) findViewById(R.id.btn_to_novel_site);
         btnToAppManager = (Button) findViewById(R.id.btn_to_app_manager);
         btnToSafeBox = (Button) findViewById(R.id.btn_to_safebox);
+        btnToTextGen = (Button) findViewById(R.id.btn_to_text_gen);
         btnBackLogin = (Button) findViewById(R.id.btn_back_login);
         btnExit = (Button) findViewById(R.id.btn_exit);
 
@@ -97,6 +98,12 @@ public class MainActivity extends Activity {
         btnToSafeBox.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 startActivity(new Intent(MainActivity.this, SafeBoxActivity.class));
+            }
+        });
+        
+        btnToTextGen.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                startActivity(new Intent(MainActivity.this, TextGenActivity.class));
             }
         });
 
