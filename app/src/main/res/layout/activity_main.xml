@@ -198,6 +198,30 @@
             android:textStyle="bold"
             android:stateListAnimator="@null" />
 
+        <Button
+            android:id="@+id/btn_to_crypto"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:layout_marginTop="15dp"
+            android:background="@drawable/selector_neumorph_btn"
+            android:text="🔐 骇 客 工 具 箱"
+            android:textColor="#16A085"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:stateListAnimator="@null" />
+
+        <Button
+            android:id="@+id/btn_to_ai_chat"
+            android:layout_width="match_parent"
+            android:layout_height="55dp"
+            android:layout_marginTop="15dp"
+            android:background="@drawable/selector_neumorph_btn"
+            android:text="🧠 终 端 神 经 网 络"
+            android:textColor="#2980B9"
+            android:textSize="13sp"
+            android:textStyle="bold"
+            android:stateListAnimator="@null" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

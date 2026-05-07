@@ -17,7 +17,7 @@ import java.util.*;
 public class MainActivity extends Activity {
     private TextView tvClock, tvBattery, tvClipboard, tvNotice, tvNetSpeed;
     private ProgressBar pbCpu, pbRam, pbRom;
-    private Button btnStartFloat, btnToWatermark, btnBackLogin, btnExit, btnToVideoSite, btnToNovelSite, btnToAppManager, btnToSafeBox, btnToTextGen;
+    private Button btnStartFloat, btnToWatermark, btnBackLogin, btnExit, btnToVideoSite, btnToNovelSite, btnToAppManager, btnToSafeBox, btnToTextGen, btnToCrypto, btnToAiChat;
     
     private Handler handler = new Handler(Looper.getMainLooper());
     private Runnable timer;
@@ -62,11 +62,13 @@ public class MainActivity extends Activity {
         btnToAppManager = (Button) findViewById(R.id.btn_to_app_manager);
         btnToSafeBox = (Button) findViewById(R.id.btn_to_safebox);
         btnToTextGen = (Button) findViewById(R.id.btn_to_text_gen);
+        btnToCrypto = (Button) findViewById(R.id.btn_to_crypto);
+        btnToAiChat = (Button) findViewById(R.id.btn_to_ai_chat); // 綁定 AI 終端按鈕
         btnBackLogin = (Button) findViewById(R.id.btn_back_login);
         btnExit = (Button) findViewById(R.id.btn_exit);
 
         initClickListeners();
-        fetchCloudData(); // 核心：恢復公告與更新檢查
+        fetchCloudData();
         
         lastRxBytes = TrafficStats.getTotalRxBytes();
         lastTxBytes = TrafficStats.getTotalTxBytes();
@@ -107,6 +109,23 @@ public class MainActivity extends Activity {
             }
         });
 
+        if (btnToCrypto != null) {
+            btnToCrypto.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    startActivity(new Intent(MainActivity.this, CryptoToolActivity.class));
+                }
+            });
+        }
+
+        // 綁定 AI 終端跳轉邏輯
+        if (btnToAiChat != null) {
+            btnToAiChat.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    startActivity(new Intent(MainActivity.this, AiChatActivity.class));
+                }
+            });
+        }
+
         findViewById(R.id.layout_clip_history).setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { showClipboardHistoryDialog(); }
         });
@@ -132,7 +151,6 @@ public class MainActivity extends Activity {
         });
     }
 
-    // 🛡️ 重新恢復的雲端管控引擎
     private void fetchCloudData() {
         userTask = new UserTask();
         userTask.execute("get_notice", "", "", new UserTask.UserCallback() {
@@ -140,28 +158,23 @@ public class MainActivity extends Activity {
                 if (!success) return;
                 try {
                     JSONObject cloudJson = new JSONObject(message);
-                    
-                    // 1. 強制更新檢查
                     int cloudVersion = cloudJson.optInt("version_code", 0);
                     final String updateUrl = cloudJson.optString("update_url", "");
                     int localVersion = getPackageManager().getPackageInfo(getPackageName(), 0).versionCode;
 
                     if (cloudVersion > localVersion && !updateUrl.isEmpty()) {
                         showUpdateDialog(updateUrl);
-                        return; // 優先處理更新，不再彈出普通公告
+                        return; 
                     }
 
-                    // 2. 更新跑馬燈文字
                     tvNotice.setText(cloudJson.optString("content", "歡迎使用小欲 v2.0"));
                     
-                    // 3. 公告彈窗檢查（具備重複彈出過濾邏輯）
                     String cloudPopup = cloudJson.optString("popup", "");
                     if (!cloudPopup.isEmpty()) {
                         String today = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(new Date());
                         String lastIgnoreDate = sp.getString("last_notice_ignore_date", "");
                         String lastIgnoreContent = sp.getString("last_notice_ignore_content", "");
                         
-                        // 若公告內容更新，或今天還未展示過，則彈出
                         if (!cloudPopup.equals(lastIgnoreContent) || !today.equals(lastIgnoreDate)) {
                             showNoticeDialog(cloudPopup, today);
                         }
@@ -203,7 +216,7 @@ public class MainActivity extends Activity {
         btnUpdate.setText("立即下載");
         view.findViewById(R.id.dialog_btn_ignore).setVisibility(View.GONE);
         
-        dialog.setCancelable(false); // 強制更新不可取消
+        dialog.setCancelable(false); 
         dialog.setContentView(view);
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         

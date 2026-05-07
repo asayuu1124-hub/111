@@ -45,8 +45,10 @@
 
         <activity android:name=".AppManagerActivity" android:screenOrientation="portrait" />
         <activity android:name=".SafeBoxActivity" android:screenOrientation="portrait" android:windowSoftInputMode="adjustPan" />
-        
         <activity android:name=".TextGenActivity" android:screenOrientation="portrait" />
+        <activity android:name=".CryptoToolActivity" android:screenOrientation="portrait" android:windowSoftInputMode="adjustPan" />
+
+        <activity android:name=".AiChatActivity" android:screenOrientation="portrait" android:windowSoftInputMode="adjustResize" />
 
         <service android:name=".FloatingService" android:enabled="true" android:exported="false" />
 
