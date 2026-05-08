@@ -106,9 +106,9 @@ public class SafeBoxActivity extends Activity {
         lvVaultFiles.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
             @Override public boolean onItemLongClick(AdapterView<?> parent, View view, final int position, long id) {
                 new AlertDialog.Builder(SafeBoxActivity.this)
-                    .setTitle("刪除確認")
-                    .setMessage("確定要永久銷毀此文件嗎？")
-                    .setPositiveButton("銷毀", new DialogInterface.OnClickListener() {
+                    .setTitle("删除确认")
+                    .setMessage("确定要永久销毁此文件吗？")
+                    .setPositiveButton("销毁", new DialogInterface.OnClickListener() {
                         @Override public void onClick(DialogInterface dialog, int which) {
                             currentFiles.get(position).delete();
                             loadFiles();
@@ -125,7 +125,7 @@ public class SafeBoxActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 30) {
             boolean hasPermission = false;
             try {
-                // 物理級 I/O 探針測試，徹底取代高版本 API 反射，繞過編譯器檢查
+                // 物理级 I/O 探针测试，彻底取代高版本 API 反射，绕过编译器检查
                 File testFile = new File(Environment.getExternalStorageDirectory(), ".safebox_test");
                 if (testFile.exists()) testFile.delete();
                 hasPermission = testFile.createNewFile();
@@ -166,7 +166,7 @@ public class SafeBoxActivity extends Activity {
         String real = etRealPwd.getText().toString();
         String fake = etFakePwd.getText().toString();
         if (real.isEmpty() || fake.isEmpty() || real.equals(fake)) {
-            Toast.makeText(this, "密碼不可為空且不能相同", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "密码不可为空且不能相同", Toast.LENGTH_SHORT).show();
             return;
         }
         try {
@@ -187,7 +187,7 @@ public class SafeBoxActivity extends Activity {
             } else if (hash.equals(sp.getString("fake_hash", ""))) {
                 mountVault(pwd, "Fake");
             } else {
-                Toast.makeText(this, "密鑰錯誤", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "密钥错误", Toast.LENGTH_SHORT).show();
             }
         } catch (Exception e) {}
     }
@@ -226,13 +226,13 @@ public class SafeBoxActivity extends Activity {
         layout.setBackgroundResource(R.drawable.nm_card_bg);
 
         TextView tvTitle = new TextView(this);
-        tvTitle.setText("📝 新建加密記事");
+        tvTitle.setText("📝 新建加密记事");
         tvTitle.setTextColor(0xFF333333);
         tvTitle.setTextSize(16);
         layout.addView(tvTitle);
 
         final EditText etTitle = new EditText(this);
-        etTitle.setHint("標題...");
+        etTitle.setHint("标题...");
         etTitle.setBackgroundResource(R.drawable.nm_input_inset);
         etTitle.setPadding(30, 30, 30, 30);
         LinearLayout.LayoutParams lp1 = new LinearLayout.LayoutParams(-1, -2);
@@ -240,7 +240,7 @@ public class SafeBoxActivity extends Activity {
         layout.addView(etTitle, lp1);
 
         final EditText etContent = new EditText(this);
-        etContent.setHint("內容...");
+        etContent.setHint("内容...");
         etContent.setBackgroundResource(R.drawable.nm_input_inset);
         etContent.setPadding(30, 30, 30, 30);
         etContent.setGravity(Gravity.TOP);
@@ -271,7 +271,7 @@ public class SafeBoxActivity extends Activity {
                         loadFiles();
                         dialog.dismiss();
                     } catch (Exception e) {
-                        Toast.makeText(SafeBoxActivity.this, "加密失敗", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(SafeBoxActivity.this, "加密失败", Toast.LENGTH_SHORT).show();
                     }
                 }
             }
@@ -286,22 +286,22 @@ public class SafeBoxActivity extends Activity {
                 byte[] data = decryptFileToBytes(file, currentPassword);
                 showNoteContentDialog(file.getName().replace(".snt", ""), new String(data, "UTF-8"));
             } catch (Exception e) {
-                Toast.makeText(this, "解密失敗或密鑰不匹配", Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, "解密失败或密钥不匹配", Toast.LENGTH_SHORT).show();
             }
         } else {
             new AlertDialog.Builder(this)
-                .setTitle("導出文件")
-                .setMessage("是否將此文件解密並導出至 Download/XiaoyuExport 目錄？")
-                .setPositiveButton("導出", new DialogInterface.OnClickListener() {
+                .setTitle("导出文件")
+                .setMessage("是否将此文件解密并导出至 Download/XiaoyuExport 目录？")
+                .setPositiveButton("导出", new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface dialog, int which) {
                         try {
                             File exportDir = new File(Environment.getExternalStorageDirectory(), "Download/XiaoyuExport");
                             if (!exportDir.exists()) exportDir.mkdirs();
                             File exportedFile = new File(exportDir, file.getName());
                             decryptFileToFile(file, exportedFile, currentPassword);
-                            Toast.makeText(SafeBoxActivity.this, "導出成功: " + exportedFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
+                            Toast.makeText(SafeBoxActivity.this, "导出成功: " + exportedFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
                         } catch (Exception e) {
-                            Toast.makeText(SafeBoxActivity.this, "導出失敗", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(SafeBoxActivity.this, "导出失败", Toast.LENGTH_SHORT).show();
                         }
                     }
                 }).setNegativeButton("取消", null).show();
@@ -334,14 +334,14 @@ public class SafeBoxActivity extends Activity {
         
         layout.addView(scroll, scrollLp);
 
-        // 新增的水平按鈕列：一鍵複製與閱畢
+        // 新增的水平按钮列：一键复制与阅毕
         LinearLayout btnLayout = new LinearLayout(this);
         btnLayout.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams btnLayoutLp = new LinearLayout.LayoutParams(-1, 150);
         btnLayoutLp.topMargin = 40;
 
         Button btnCopy = new Button(this);
-        btnCopy.setText("複 製");
+        btnCopy.setText("复 制");
         btnCopy.setBackgroundResource(R.drawable.selector_neumorph_btn);
         btnCopy.setTextColor(0xFF4A90E2);
         LinearLayout.LayoutParams copyLp = new LinearLayout.LayoutParams(0, -1, 1.0f);
@@ -349,7 +349,7 @@ public class SafeBoxActivity extends Activity {
         btnLayout.addView(btnCopy, copyLp);
 
         Button btnClose = new Button(this);
-        btnClose.setText("閱 畢");
+        btnClose.setText("阅 毕");
         btnClose.setBackgroundResource(R.drawable.selector_neumorph_btn);
         btnClose.setTextColor(0xFF888888);
         LinearLayout.LayoutParams closeLp = new LinearLayout.LayoutParams(0, -1, 1.0f);
@@ -360,13 +360,13 @@ public class SafeBoxActivity extends Activity {
         dialog.setContentView(layout);
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         
-        // 剪貼簿邏輯注入
+        // 剪贴板逻辑注入
         btnCopy.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                 cb.setPrimaryClip(ClipData.newPlainText(title, content));
-                Toast.makeText(SafeBoxActivity.this, "內容已安全複製", Toast.LENGTH_SHORT).show();
+                Toast.makeText(SafeBoxActivity.this, "内容已安全复制", Toast.LENGTH_SHORT).show();
             }
         });
         
@@ -389,11 +389,11 @@ public class SafeBoxActivity extends Activity {
 
     private void showImportNameDialog(final Uri uri) {
         final EditText input = new EditText(this);
-        input.setHint("輸入保存的文件名 (含後綴)");
+        input.setHint("输入保存的文件名 (含后缀)");
         new AlertDialog.Builder(this)
-            .setTitle("導入文件")
+            .setTitle("导入文件")
             .setView(input)
-            .setPositiveButton("加密導入", new DialogInterface.OnClickListener() {
+            .setPositiveButton("加密导入", new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface dialog, int which) {
                     String name = input.getText().toString();
                     if (!name.isEmpty()) {
@@ -402,16 +402,16 @@ public class SafeBoxActivity extends Activity {
                             File outFile = new File(currentVaultDir, name);
                             encryptStreamToFile(is, outFile, currentPassword);
                             loadFiles();
-                            Toast.makeText(SafeBoxActivity.this, "導入成功", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(SafeBoxActivity.this, "导入成功", Toast.LENGTH_SHORT).show();
                         } catch (Exception e) {
-                            Toast.makeText(SafeBoxActivity.this, "導入失敗", Toast.LENGTH_SHORT).show();
+                            Toast.makeText(SafeBoxActivity.this, "导入失败", Toast.LENGTH_SHORT).show();
                         }
                     }
                 }
             }).setNegativeButton("取消", null).show();
     }
 
-    // --- 底層加密引擎 ---
+    // --- 底层加密引擎 ---
     
     private String getSHA256(String str) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");

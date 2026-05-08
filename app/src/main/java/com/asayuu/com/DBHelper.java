@@ -8,7 +8,7 @@ import java.util.List;
 
 public class DBHelper extends SQLiteOpenHelper {
     private static final String DB_NAME = "asayuu_user.db";
-    private static final int DB_VERSION = 4; // 保持 4，僅新增方法
+    private static final int DB_VERSION = 4; // 保持 4，仅新增方法
 
     public DBHelper(Context context) {
         super(context, DB_NAME, null, DB_VERSION);
@@ -19,7 +19,7 @@ public class DBHelper extends SQLiteOpenHelper {
         db.execSQL("CREATE TABLE users (id INTEGER PRIMARY KEY AUTOINCREMENT, username TEXT, password TEXT)");
         db.execSQL("CREATE TABLE clipboard_history (id INTEGER PRIMARY KEY AUTOINCREMENT, content TEXT, time LONG)");
         
-        // 🧠 AI 神經網路對話相關
+        // 🧠 AI 神经网络对话相关
         db.execSQL("CREATE TABLE ai_chat_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, update_time LONG)");
         db.execSQL("CREATE TABLE ai_chat_history (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id INTEGER, role TEXT, content TEXT, time LONG)");
     }
@@ -36,12 +36,12 @@ public class DBHelper extends SQLiteOpenHelper {
             db.execSQL("CREATE TABLE IF NOT EXISTS ai_chat_sessions (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, update_time LONG)");
             try { db.execSQL("ALTER TABLE ai_chat_history ADD COLUMN session_id INTEGER DEFAULT 1"); } catch (Exception e) {}
             ContentValues cv = new ContentValues();
-            cv.put("id", 1); cv.put("title", "初代神經鏈路"); cv.put("update_time", System.currentTimeMillis());
+            cv.put("id", 1); cv.put("title", "初代神经链路"); cv.put("update_time", System.currentTimeMillis());
             db.insertWithOnConflict("ai_chat_sessions", null, cv, SQLiteDatabase.CONFLICT_IGNORE);
         }
     }
 
-    // --- 剪貼板與用戶邏輯 ---
+    // --- 剪贴板与用户逻辑 ---
     public boolean register(String user, String pass) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues cv = new ContentValues();
@@ -74,7 +74,7 @@ public class DBHelper extends SQLiteOpenHelper {
         c.close(); return list;
     }
 
-    // --- 🧠 終端神經網路 (多對話 Session 版) ---
+    // --- 🧠 终端神经网络 (多对话 Session 版) ---
 
     public long createAiSession(String title) {
         SQLiteDatabase db = this.getWritableDatabase();
@@ -95,7 +95,7 @@ public class DBHelper extends SQLiteOpenHelper {
         return list;
     }
 
-    // ⭐ 新增：自定義修改會話名稱
+    // ⭐ 新增：自定义修改会话名称
     public void updateSessionTitle(long sessionId, String newTitle) {
         if (newTitle == null || newTitle.trim().isEmpty()) return;
         SQLiteDatabase db = this.getWritableDatabase();

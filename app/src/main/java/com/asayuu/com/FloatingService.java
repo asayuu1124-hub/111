@@ -43,7 +43,7 @@ public class FloatingService extends Service {
     private int batteryLevel = -1;
     private float batteryTemp = -1;
 
-    // --- 主動告警狀態機 ---
+    // --- 主动告警状态机 ---
     private boolean isTempWarned = false;
     private boolean isLowBatteryWarned = false;
     private boolean isFullBatteryWarned = false;
@@ -67,33 +67,33 @@ public class FloatingService extends Service {
                 batteryTemp = temp / 10.0f;
             }
 
-            // 物理探針主動告警系統
+            // 物理探针主动告警系统
             try {
                 Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
                 
-                // 溫控警告 (≥ 42°C)
+                // 温控警告 (≥ 42°C)
                 if (batteryTemp >= 42.0f && !isTempWarned) {
                     isTempWarned = true;
                     if (vibrator != null) vibrator.vibrate(new long[]{0, 500, 200, 500}, -1);
-                    Toast.makeText(context, "⚠️ 警告：設備溫度過高 (" + batteryTemp + "°C)", Toast.LENGTH_LONG).show();
+                    Toast.makeText(context, "⚠️ 警告：设备温度过高 (" + batteryTemp + "°C)", Toast.LENGTH_LONG).show();
                 } else if (batteryTemp < 40.0f) {
-                    isTempWarned = false; // 降溫後重置
+                    isTempWarned = false; // 降温后重置
                 }
 
-                // 低電量警告 (≤ 15%)
+                // 低电量警告 (≤ 15%)
                 if (batteryLevel <= 15 && !isLowBatteryWarned) {
                     isLowBatteryWarned = true;
                     if (vibrator != null) vibrator.vibrate(new long[]{0, 300, 100, 300}, -1);
-                    Toast.makeText(context, "⚠️ 警告：電量極低 (" + batteryLevel + "%)", Toast.LENGTH_LONG).show();
+                    Toast.makeText(context, "⚠️ 警告：电量极低 (" + batteryLevel + "%)", Toast.LENGTH_LONG).show();
                 } else if (batteryLevel > 20) {
-                    isLowBatteryWarned = false; // 充電後重置
+                    isLowBatteryWarned = false; // 充电后重置
                 }
 
-                // 滿電提醒
+                // 满电提醒
                 if (batteryLevel == 100 && !isFullBatteryWarned) {
                     isFullBatteryWarned = true;
                     if (vibrator != null) vibrator.vibrate(500);
-                    Toast.makeText(context, "✅ 提示：電池已充滿，請及時拔下電源", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(context, "✅ 提示：电池已充满，请及时拔下电源", Toast.LENGTH_SHORT).show();
                 } else if (batteryLevel < 95) {
                     isFullBatteryWarned = false;
                 }
@@ -516,9 +516,9 @@ public class FloatingService extends Service {
 
         if (batteryLevel != -1) {
             tvBattery.setText("电池状态: " + batteryLevel + "% | 温度: " + batteryTemp + "°C");
-            // 動態告警 UI 變色
+            // 动态告警 UI 变色
             if (batteryTemp >= 42.0f || batteryLevel <= 15) {
-                tvBattery.setTextColor(0xFFE74C3C); // 警示紅
+                tvBattery.setTextColor(0xFFE74C3C); // 警示红
             } else {
                 tvBattery.setTextColor(0xFF4E5D6A); // 原色
             }

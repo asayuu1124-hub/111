@@ -63,7 +63,7 @@ public class MainActivity extends Activity {
         btnToSafeBox = (Button) findViewById(R.id.btn_to_safebox);
         btnToTextGen = (Button) findViewById(R.id.btn_to_text_gen);
         btnToCrypto = (Button) findViewById(R.id.btn_to_crypto);
-        btnToAiChat = (Button) findViewById(R.id.btn_to_ai_chat); // 綁定 AI 終端按鈕
+        btnToAiChat = (Button) findViewById(R.id.btn_to_ai_chat); // 绑定 AI 终端按钮
         btnBackLogin = (Button) findViewById(R.id.btn_back_login);
         btnExit = (Button) findViewById(R.id.btn_exit);
 
@@ -117,7 +117,7 @@ public class MainActivity extends Activity {
             });
         }
 
-        // 綁定 AI 終端跳轉邏輯
+        // 绑定 AI 终端跳转逻辑
         if (btnToAiChat != null) {
             btnToAiChat.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) {
@@ -167,7 +167,7 @@ public class MainActivity extends Activity {
                         return; 
                     }
 
-                    tvNotice.setText(cloudJson.optString("content", "歡迎使用小欲 v2.0"));
+                    tvNotice.setText(cloudJson.optString("content", "欢迎使用小欲 v2.0"));
                     
                     String cloudPopup = cloudJson.optString("popup", "");
                     if (!cloudPopup.isEmpty()) {
@@ -210,10 +210,10 @@ public class MainActivity extends Activity {
     private void showUpdateDialog(final String url) {
         final Dialog dialog = new Dialog(this);
         View view = getLayoutInflater().inflate(R.layout.layout_dialog_notice, null);
-        ((TextView) view.findViewById(R.id.dialog_title)).setText("🚀 發現新版本");
-        ((TextView) view.findViewById(R.id.dialog_msg)).setText("請升級至最新版本以獲得更好的體驗。");
+        ((TextView) view.findViewById(R.id.dialog_title)).setText("🚀 发现新版本");
+        ((TextView) view.findViewById(R.id.dialog_msg)).setText("请升级至最新版本以获得更好的体验。");
         Button btnUpdate = (Button) view.findViewById(R.id.dialog_btn_ok);
-        btnUpdate.setText("立即下載");
+        btnUpdate.setText("立即下载");
         view.findViewById(R.id.dialog_btn_ignore).setVisibility(View.GONE);
         
         dialog.setCancelable(false); 
@@ -242,7 +242,7 @@ public class MainActivity extends Activity {
         batteryReceiver = new BroadcastReceiver() {
             @Override public void onReceive(Context context, Intent intent) {
                 int level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-                tvBattery.setText("電量监控: " + level + "%");
+                tvBattery.setText("电量监控: " + level + "%");
             }
         };
         registerReceiver(batteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));

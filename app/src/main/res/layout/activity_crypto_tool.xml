@@ -9,7 +9,7 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="🔐 駭客工具箱 (加解密引擎)"
+        android:text="🔐 骇客工具箱 (加解密引擎)"
         android:textSize="18sp"
         android:textColor="#333333"
         android:gravity="center"
@@ -29,7 +29,7 @@
                 android:id="@+id/et_crypto_input"
                 android:layout_width="match_parent"
                 android:layout_height="120dp"
-                android:hint="在此輸入待處理的文本或密文..."
+                android:hint="在此输入待处理的文本或密文..."
                 android:gravity="top|left"
                 android:padding="15dp"
                 android:textSize="14sp"
@@ -41,7 +41,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="15dp"
-                android:hint="可選：輸入 AES/DES 密鑰 (哈希自動留空)"
+                android:hint="可选：输入 AES/DES 密钥 (哈希自动留空)"
                 android:padding="15dp"
                 android:textSize="14sp"
                 android:singleLine="true"
@@ -62,8 +62,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:orientation="horizontal">
-                <Button android:id="@+id/btn_b64_enc" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="B64 編碼" android:background="@drawable/selector_neumorph_btn" android:textColor="#4E5D6A" android:layout_marginRight="5dp"/>
-                <Button android:id="@+id/btn_b64_dec" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="B64 解碼" android:background="@drawable/selector_neumorph_btn" android:textColor="#4E5D6A" android:layout_marginLeft="5dp"/>
+                <Button android:id="@+id/btn_b64_enc" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="B64 编码" android:background="@drawable/selector_neumorph_btn" android:textColor="#4E5D6A" android:layout_marginRight="5dp"/>
+                <Button android:id="@+id/btn_b64_dec" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="B64 解码" android:background="@drawable/selector_neumorph_btn" android:textColor="#4E5D6A" android:layout_marginLeft="5dp"/>
             </LinearLayout>
             
             <LinearLayout
@@ -71,8 +71,8 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:orientation="horizontal">
-                <Button android:id="@+id/btn_url_enc" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="URL 編碼" android:background="@drawable/selector_neumorph_btn" android:textColor="#4E5D6A" android:layout_marginRight="5dp"/>
-                <Button android:id="@+id/btn_url_dec" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="URL 解碼" android:background="@drawable/selector_neumorph_btn" android:textColor="#4E5D6A" android:layout_marginLeft="5dp"/>
+                <Button android:id="@+id/btn_url_enc" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="URL 编码" android:background="@drawable/selector_neumorph_btn" android:textColor="#4E5D6A" android:layout_marginRight="5dp"/>
+                <Button android:id="@+id/btn_url_dec" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="URL 解码" android:background="@drawable/selector_neumorph_btn" android:textColor="#4E5D6A" android:layout_marginLeft="5dp"/>
             </LinearLayout>
 
             <LinearLayout
@@ -80,14 +80,14 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:orientation="horizontal">
-                <Button android:id="@+id/btn_morse_enc" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="摩斯密碼 加密" android:background="@drawable/selector_neumorph_btn" android:textColor="#8E44AD" android:layout_marginRight="5dp"/>
-                <Button android:id="@+id/btn_morse_dec" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="摩斯密碼 解密" android:background="@drawable/selector_neumorph_btn" android:textColor="#8E44AD" android:layout_marginLeft="5dp"/>
+                <Button android:id="@+id/btn_morse_enc" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="摩斯密码 加密" android:background="@drawable/selector_neumorph_btn" android:textColor="#8E44AD" android:layout_marginRight="5dp"/>
+                <Button android:id="@+id/btn_morse_dec" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="摩斯密码 解密" android:background="@drawable/selector_neumorph_btn" android:textColor="#8E44AD" android:layout_marginLeft="5dp"/>
             </LinearLayout>
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="▼ 物理級對稱加密"
+                android:text="▼ 物理级对称加密"
                 android:textSize="12sp"
                 android:textColor="#999999"
                 android:layout_marginTop="20dp"
@@ -122,7 +122,7 @@
                     android:id="@+id/tv_crypto_result"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="處理結果將顯示在此處..."
+                    android:text="处理结果将显示在此处..."
                     android:textColor="#333333"
                     android:textSize="14sp"
                     android:textIsSelectable="true"
@@ -134,7 +134,7 @@
                     android:layout_height="wrap_content"
                     android:layout_below="@id/tv_crypto_result"
                     android:layout_marginTop="15dp"
-                    android:text="一鍵複製結果"
+                    android:text="一键复制结果"
                     android:background="@drawable/selector_neumorph_btn"
                     android:textColor="#4A90E2" />
             </RelativeLayout>

@@ -27,7 +27,7 @@ public class CryptoToolActivity extends Activity implements View.OnClickListener
     private EditText etInput, etKey;
     private TextView tvResult;
 
-    // --- 摩斯密碼字典矩陣 ---
+    // --- 摩斯密码字典矩阵 ---
     private static final String[] MORSE_CHARS = {
         "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", 
         "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", 
@@ -57,7 +57,7 @@ public class CryptoToolActivity extends Activity implements View.OnClickListener
         findViewById(R.id.btn_url_enc).setOnClickListener(this);
         findViewById(R.id.btn_url_dec).setOnClickListener(this);
         
-        // 綁定摩斯密碼按鈕
+        // 绑定摩斯密码按钮
         findViewById(R.id.btn_morse_enc).setOnClickListener(this);
         findViewById(R.id.btn_morse_dec).setOnClickListener(this);
 
@@ -70,10 +70,10 @@ public class CryptoToolActivity extends Activity implements View.OnClickListener
             @Override
             public void onClick(View v) {
                 String res = tvResult.getText().toString();
-                if (!res.isEmpty() && !res.contains("處理結果將顯示在此處")) {
+                if (!res.isEmpty() && !res.contains("处理结果将显示在此处")) {
                     ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                     cb.setPrimaryClip(ClipData.newPlainText("CryptoResult", res));
-                    Toast.makeText(CryptoToolActivity.this, "已複製到剪貼簿", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(CryptoToolActivity.this, "已复制到剪贴板", Toast.LENGTH_SHORT).show();
                 }
             }
         });
@@ -85,7 +85,7 @@ public class CryptoToolActivity extends Activity implements View.OnClickListener
         String key = etKey.getText().toString().trim();
 
         if (input.isEmpty()) {
-            Toast.makeText(this, "請先輸入文本", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "请先输入文本", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -108,11 +108,11 @@ public class CryptoToolActivity extends Activity implements View.OnClickListener
             
             tvResult.setText(result);
         } catch (Exception e) {
-            tvResult.setText("❌ 處理失敗: \n" + e.getMessage());
+            tvResult.setText("❌ 处理失败: \n" + e.getMessage());
         }
     }
 
-    // --- 核心算法庫 ---
+    // --- 核心算法库 ---
 
     private String encodeMorse(String input) {
         input = input.toUpperCase();
@@ -120,7 +120,7 @@ public class CryptoToolActivity extends Activity implements View.OnClickListener
         for (int i = 0; i < input.length(); i++) {
             char c = input.charAt(i);
             if (c == ' ') {
-                sb.append("/ "); // 原文的空格用斜槓代表
+                sb.append("/ "); // 原文的空格用斜杠代表
                 continue;
             }
             boolean found = false;
@@ -132,7 +132,7 @@ public class CryptoToolActivity extends Activity implements View.OnClickListener
                 }
             }
             if (!found) {
-                sb.append(c).append(" "); // 找不到的字元（如中文）原樣輸出
+                sb.append(c).append(" "); // 找不到的字符（如中文）原样输出
             }
         }
         return sb.toString().trim();
@@ -153,10 +153,10 @@ public class CryptoToolActivity extends Activity implements View.OnClickListener
                     }
                 }
                 if (!found) {
-                    sb.append(letter); // 找不到的符號原樣保留
+                    sb.append(letter); // 找不到的符号原样保留
                 }
             }
-            sb.append(" "); // 單詞解碼完畢補上空格
+            sb.append(" "); // 单词解码完毕补上空格
         }
         return sb.toString().trim();
     }
@@ -174,13 +174,13 @@ public class CryptoToolActivity extends Activity implements View.OnClickListener
     }
 
     private String doSymmetricCrypto(String input, String keyStr, String type, boolean isEncrypt) throws Exception {
-        if (keyStr.isEmpty()) throw new Exception("請輸入 " + type + " 加密密鑰");
+        if (keyStr.isEmpty()) throw new Exception("请输入 " + type + " 加密密钥");
 
         int keyLen = type.equals("AES") ? 16 : 8;
         int ivLen = type.equals("AES") ? 16 : 8;
         String transform = type + "/CBC/PKCS5Padding";
 
-        // 密鑰處理：無論用戶輸入什麼，一律哈希後截取指定長度，防止 InvalidKeyException
+        // 密钥处理：无论用户输入什么，一律哈希后截取指定长度，防止 InvalidKeyException
         byte[] keyBytes = Arrays.copyOf(MessageDigest.getInstance("SHA-256").digest(keyStr.getBytes("UTF-8")), keyLen);
         SecretKeySpec keySpec = new SecretKeySpec(keyBytes, type);
 
@@ -193,7 +193,7 @@ public class CryptoToolActivity extends Activity implements View.OnClickListener
             
             byte[] encrypted = cipher.doFinal(input.getBytes("UTF-8"));
             
-            // 將 IV 藏入密文頭部
+            // 将 IV 藏入密文头部
             byte[] combined = new byte[iv.length + encrypted.length];
             System.arraycopy(iv, 0, combined, 0, iv.length);
             System.arraycopy(encrypted, 0, combined, iv.length, encrypted.length);
@@ -201,9 +201,9 @@ public class CryptoToolActivity extends Activity implements View.OnClickListener
             return Base64.encodeToString(combined, Base64.NO_WRAP);
         } else {
             byte[] combined = Base64.decode(input, Base64.NO_WRAP);
-            if (combined.length < ivLen) throw new Exception("無效的密文數據");
+            if (combined.length < ivLen) throw new Exception("无效的密文数据");
             
-            // 提取頭部的 IV
+            // 提取头部的 IV
             byte[] iv = new byte[ivLen];
             System.arraycopy(combined, 0, iv, 0, ivLen);
             byte[] encrypted = new byte[combined.length - ivLen];

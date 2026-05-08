@@ -25,7 +25,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="5dp"
-            android:text="請設置真實密碼與偽裝密碼，兩者將打開不同的空間。"
+            android:text="请设置真实密码与伪装密码，两者将打开不同的空间。"
             android:textColor="#888888"
             android:textSize="12sp" />
         <EditText
@@ -34,7 +34,7 @@
             android:layout_height="50dp"
             android:layout_marginTop="20dp"
             android:background="@drawable/nm_input_inset"
-            android:hint="設置真實密碼"
+            android:hint="设置真实密码"
             android:inputType="textPassword"
             android:paddingLeft="15dp" />
         <EditText
@@ -43,7 +43,7 @@
             android:layout_height="50dp"
             android:layout_marginTop="15dp"
             android:background="@drawable/nm_input_inset"
-            android:hint="設置偽裝密碼 (防脅迫)"
+            android:hint="设置伪装密码 (防胁迫)"
             android:inputType="textPassword"
             android:paddingLeft="15dp" />
         <Button
@@ -52,7 +52,7 @@
             android:layout_height="50dp"
             android:layout_marginTop="25dp"
             android:background="@drawable/selector_neumorph_btn"
-            android:text="固 化 空 間"
+            android:text="固 化 空 间"
             android:textColor="#4A90E2" />
     </LinearLayout>
 
@@ -76,7 +76,7 @@
             android:layout_height="50dp"
             android:layout_marginTop="20dp"
             android:background="@drawable/nm_input_inset"
-            android:hint="輸入密鑰進入暗盒"
+            android:hint="输入密钥进入暗盒"
             android:inputType="textPassword"
             android:paddingLeft="15dp" />
         <Button
@@ -85,7 +85,7 @@
             android:layout_height="50dp"
             android:layout_marginTop="25dp"
             android:background="@drawable/selector_neumorph_btn"
-            android:text="展 開 結 界"
+            android:text="展 开 结 界"
             android:textColor="#8E44AD" />
     </LinearLayout>
 
@@ -106,7 +106,7 @@
                 android:layout_weight="1"
                 android:layout_marginRight="10dp"
                 android:background="@drawable/selector_neumorph_btn"
-                android:text="📝 記 錄"
+                android:text="📝 记 录"
                 android:textColor="#27AE60" />
             <Button
                 android:id="@+id/btn_import_file"
@@ -114,7 +114,7 @@
                 android:layout_height="50dp"
                 android:layout_weight="1"
                 android:background="@drawable/selector_neumorph_btn"
-                android:text="📁 導 入"
+                android:text="📁 导 入"
                 android:textColor="#E67E22" />
         </LinearLayout>
         

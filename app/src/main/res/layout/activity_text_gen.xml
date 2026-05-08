@@ -9,7 +9,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="🔮 靈感文案萃取器"
+        android:text="🔮 灵感文案萃取器"
         android:textColor="#333333"
         android:textSize="20sp"
         android:textStyle="bold"
@@ -18,7 +18,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="點擊下方按鈕，自動從雲端獲取最新文案。"
+        android:text="点击下方按钮，自动从云端获取最新文案。"
         android:textColor="#888888"
         android:textSize="12sp"
         android:layout_marginBottom="25dp"/>
@@ -45,7 +45,7 @@
             android:layout_height="60dp"
             android:layout_weight="1"
             android:background="@drawable/selector_neumorph_btn"
-            android:text="舔狗日記"
+            android:text="舔狗日记"
             android:textColor="#E74C3C"
             android:textStyle="bold" />
     </LinearLayout>
@@ -66,7 +66,7 @@
                 android:id="@+id/tv_content"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="點擊上方按鈕獲取靈感..."
+                android:text="点击上方按钮获取灵感..."
                 android:textColor="#555555"
                 android:textSize="16sp"
                 android:lineSpacingExtra="8dp"/>
@@ -95,7 +95,7 @@
             android:layout_height="50dp"
             android:layout_weight="2"
             android:background="@drawable/selector_neumorph_btn"
-            android:text="一 鍵 複 製"
+            android:text="一 键 复 制"
             android:textColor="#27AE60"
             android:textStyle="bold" />
     </LinearLayout>

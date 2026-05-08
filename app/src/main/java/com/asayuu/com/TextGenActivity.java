@@ -31,13 +31,13 @@ public class TextGenActivity extends Activity {
     private TextView tvContent;
     private Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    // 斷網或 API 失效時的本地降級備用庫
+    // 断网或 API 失效时的本地降级备用库
     private String[] fallbackTiangou = {
-        "寶，我今天去吃麵了，吃的是什麼麵？突然想見你一麵。",
-        "今天下雨了，別人等傘，而我在等你回訊息。",
-        "你昨天晚上沒回我消息，我看了整整一晚上的聊天記錄，我覺得你肯定是太累了，早點休息寶。",
-        "寶，今天發薪水了，一共發了3000，我給你轉了3000，剩下的錢我留著吃飯，你說我懂事嗎？",
-        "我對你的愛就像拖拉機上山，轟轟烈烈..."
+        "宝，我今天去吃面了，吃的是什么面？突然想见你一面。",
+        "今天下雨了，别人等伞，而我在等你回消息。",
+        "你昨天晚上没回我消息，我看了整整一晚上的聊天记录，我觉得你肯定是太累了，早点休息宝。",
+        "宝，今天发工资了，一共发了3000，我给你转了3000，剩下的钱我留着吃饭，你说我懂事吗？",
+        "我对你的爱就像拖拉机上山，轰轰烈烈..."
     };
 
     @Override
@@ -45,7 +45,7 @@ public class TextGenActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_text_gen);
         
-        trustAllSSL(); // 繞過部分低版本 Android 的 HTTPS 證書攔截
+        trustAllSSL(); // 绕过部分低版本 Android 的 HTTPS 证书拦截
 
         tvContent = (TextView) findViewById(R.id.tv_content);
         Button btnHitokoto = (Button) findViewById(R.id.btn_hitokoto);
@@ -71,10 +71,10 @@ public class TextGenActivity extends Activity {
             @Override
             public void onClick(View v) {
                 String text = tvContent.getText().toString();
-                if (!text.isEmpty() && !text.equals("點擊上方按鈕獲取靈感...") && !text.equals("正在從雲端汲取靈感...")) {
+                if (!text.isEmpty() && !text.equals("点击上方按钮获取灵感...") && !text.equals("正在从云端汲取灵感...")) {
                     ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                     cb.setPrimaryClip(ClipData.newPlainText("TextGen", text));
-                    Toast.makeText(TextGenActivity.this, "已複製到剪貼簿", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(TextGenActivity.this, "已复制到剪贴板", Toast.LENGTH_SHORT).show();
                 }
             }
         });
@@ -88,14 +88,14 @@ public class TextGenActivity extends Activity {
     }
 
     private void fetchText(final String type) {
-        tvContent.setText("正在從雲端汲取靈感...");
+        tvContent.setText("正在从云端汲取灵感...");
         new Thread(new Runnable() {
             @Override
             public void run() {
                 try {
                     String result = "";
                     if (type.equals("hitokoto")) {
-                        // 獲取每日一言 (含動畫、文學、原創等多種分類)
+                        // 获取每日一言 (含动画、文学、原创等多种分类)
                         URL url = new URL("https://v1.hitokoto.cn/?c=a&c=b&c=c&c=d&c=i");
                         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                         conn.setRequestMethod("GET");
@@ -116,10 +116,10 @@ public class TextGenActivity extends Activity {
                             String from = json.optString("from");
                             result = hitokoto + "\n\n—— 「" + from + "」";
                         } else {
-                            result = "獲取失敗，伺服器無響應。";
+                            result = "获取失败，服务器无响应。";
                         }
                     } else if (type.equals("tiangou")) {
-                        // 獲取舔狗日記 (純文本返回)
+                        // 获取舔狗日记 (纯文本返回)
                         URL url = new URL("https://api.vvhan.com/api/text/tiangou");
                         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                         conn.setRequestMethod("GET");
@@ -136,7 +136,7 @@ public class TextGenActivity extends Activity {
                             reader.close();
                             result = sb.toString();
                         } else {
-                            // API 報錯時觸發降級機制
+                            // API 报错时触发降级机制
                             result = fallbackTiangou[new Random().nextInt(fallbackTiangou.length)];
                         }
                     }
@@ -150,7 +150,7 @@ public class TextGenActivity extends Activity {
                     });
                 } catch (Exception e) {
                     final String fallback = type.equals("tiangou") ? 
-                            fallbackTiangou[new Random().nextInt(fallbackTiangou.length)] : "網絡請求異常，請檢查網絡連接是否正常。";
+                            fallbackTiangou[new Random().nextInt(fallbackTiangou.length)] : "网络请求异常，请检查网络连接是否正常。";
                     mainHandler.post(new Runnable() {
                         @Override
                         public void run() {

@@ -2,6 +2,8 @@ package com.asayuu.com;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -9,8 +11,16 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.os.BatteryManager;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Spannable;
+import android.text.SpannableStringBuilder;
+import android.text.TextPaint;
+import android.text.method.LinkMovementMethod;
+import android.text.style.ClickableSpan;
+import android.text.style.ForegroundColorSpan;
+import android.text.style.RelativeSizeSpan;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -27,16 +37,24 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
+import javax.crypto.Cipher;
+import javax.crypto.CipherOutputStream;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.HostnameVerifier;
 import javax.net.ssl.HttpsURLConnection;
 import javax.net.ssl.SSLContext;
@@ -52,6 +70,7 @@ public class AiChatActivity extends Activity {
     private TextView tvStatus, tvTitle, tvModel;
     
     private TextView btnToggleThink, btnToggleSearch;
+    private TextView btnToggleAgent; // 动态注入的工作流开关
     
     private LinearLayout layoutDrawer;
     private View viewDrawerDim;
@@ -73,12 +92,13 @@ public class AiChatActivity extends Activity {
 
     private boolean isThinkMode = false;
     private boolean isSearchMode = false;
+    private boolean isAgentMode = false; // Agent 工作流模式状态
 
     private final String[] MODEL_NAMES = {
-        "⚡ 極速閃存 (V4-Flash)", 
-        "👑 專業旗艦 (V4-Pro)", 
-        "⚡ 通用核心 (V3 舊版)", 
-        "🧠 深度推理 (R1 舊版)"
+        "⚡ 极速闪存 (V4-Flash)", 
+        "👑 专业旗舰 (V4-Pro)", 
+        "⚡ 通用核心 (V3 旧版)", 
+        "🧠 深度推理 (R1 旧版)"
     };
     private final String[] MODEL_IDS = {
         "deepseek-v4-flash", 
@@ -111,11 +131,23 @@ public class AiChatActivity extends Activity {
         viewDrawerDim = (View) findViewById(R.id.view_drawer_dim);
         lvSessions = (ListView) findViewById(R.id.lv_sessions);
 
+        // 动态注入 Agent 工作流按钮 (零 XML 修改)
+        btnToggleAgent = new TextView(this);
+        btnToggleAgent.setText("⚪ 工作流");
+        btnToggleAgent.setTextColor(0xFF888888);
+        btnToggleAgent.setPadding(20, 0, 20, 0);
+        btnToggleAgent.setTextSize(14f);
+        try {
+            ViewGroup toggleContainer = (ViewGroup) btnToggleThink.getParent();
+            toggleContainer.addView(btnToggleAgent);
+        } catch (Exception e) {}
+
         String savedModel = sp.getString("deepseek_model", "deepseek-v4-flash");
         updateModelUI(savedModel);
 
         isThinkMode = sp.getBoolean("ai_think_mode", false);
         isSearchMode = sp.getBoolean("ai_search_mode", false);
+        isAgentMode = sp.getBoolean("ai_agent_mode", false);
         updateToggleUI();
 
         findViewById(R.id.btn_ai_back).setOnClickListener(new View.OnClickListener() {
@@ -160,6 +192,16 @@ public class AiChatActivity extends Activity {
             }
         });
 
+        btnToggleAgent.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                isAgentMode = !isAgentMode;
+                sp.edit().putBoolean("ai_agent_mode", isAgentMode).apply();
+                updateToggleUI();
+                if (isAgentMode) Toast.makeText(AiChatActivity.this, "已切换至 Agent 状态机", Toast.LENGTH_SHORT).show();
+            }
+        });
+
         chatAdapter = new ChatAdapter();
         lvChat.setAdapter(chatAdapter);
         sessionAdapter = new SessionAdapter();
@@ -179,12 +221,12 @@ public class AiChatActivity extends Activity {
             @Override
             public void onClick(View v) {
                 if (isAiTyping) {
-                    Toast.makeText(AiChatActivity.this, "請等待 AI 回覆完畢", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(AiChatActivity.this, "请等待任务回复完毕", Toast.LENGTH_SHORT).show();
                     return;
                 }
                 String apiKey = sp.getString("deepseek_api_key", "");
                 if (apiKey.isEmpty()) {
-                    Toast.makeText(AiChatActivity.this, "請先點擊右上角設定 API Key", Toast.LENGTH_LONG).show();
+                    Toast.makeText(AiChatActivity.this, "请先点击右上角设定 API Key", Toast.LENGTH_LONG).show();
                     showApiKeyDialog();
                     return;
                 }
@@ -193,7 +235,12 @@ public class AiChatActivity extends Activity {
                 if (!text.isEmpty()) {
                     addMessage("user", text, true);
                     etInput.setText("");
-                    callDeepSeekAPI(apiKey);
+                    
+                    if (isAgentMode) {
+                        callAgentWorkflowAPI(apiKey, text);
+                    } else {
+                        callDeepSeekAPI(apiKey);
+                    }
                 }
             }
         });
@@ -215,9 +262,9 @@ public class AiChatActivity extends Activity {
             public boolean onItemLongClick(AdapterView<?> parent, View view, final int position, long id) {
                 final long targetId = Long.parseLong(sessionList.get(position)[0]);
                 final String targetTitle = sessionList.get(position)[1];
-                String[] options = {"📝 重新命名", "🗑 刪除鏈路"};
+                String[] options = {"📝 重新命名", "🗑 删除链路"};
                 new AlertDialog.Builder(AiChatActivity.this)
-                    .setTitle("管理神經鏈路")
+                    .setTitle("管理神经链路")
                     .setItems(options, new DialogInterface.OnClickListener() {
                         @Override
                         public void onClick(DialogInterface dialog, int which) {
@@ -240,11 +287,19 @@ public class AiChatActivity extends Activity {
         }
 
         if (isSearchMode) {
-            btnToggleSearch.setText("🟢 聯網模式");
+            btnToggleSearch.setText("🟢 联网模式");
             btnToggleSearch.setTextColor(0xFF2980B9); 
         } else {
-            btnToggleSearch.setText("⚪ 聯網模式");
+            btnToggleSearch.setText("⚪ 联网模式");
             btnToggleSearch.setTextColor(0xFF888888); 
+        }
+
+        if (isAgentMode) {
+            btnToggleAgent.setText("🟢 工作流");
+            btnToggleAgent.setTextColor(0xFFE67E22); 
+        } else {
+            btnToggleAgent.setText("⚪ 工作流");
+            btnToggleAgent.setTextColor(0xFF888888); 
         }
     }
 
@@ -266,13 +321,13 @@ public class AiChatActivity extends Activity {
         }
 
         new AlertDialog.Builder(this)
-            .setTitle("切換神經核心 (V4 世代)")
+            .setTitle("切换神经核心 (V4 世代)")
             .setSingleChoiceItems(MODEL_NAMES, checkedItem, new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
                     sp.edit().putString("deepseek_model", MODEL_IDS[which]).apply();
                     updateModelUI(MODEL_IDS[which]);
-                    Toast.makeText(AiChatActivity.this, "已切換至: " + MODEL_NAMES[which], Toast.LENGTH_SHORT).show();
+                    Toast.makeText(AiChatActivity.this, "已切换至: " + MODEL_NAMES[which], Toast.LENGTH_SHORT).show();
                     dialog.dismiss();
                 }
             })
@@ -280,10 +335,277 @@ public class AiChatActivity extends Activity {
             .show();
     }
 
-    // --- 🌐 原生網路與流式解析引擎 (SSE) ---
+    // =========================================================================
+    // ⚙️ Agent Workflow Engine (工作流引擎)
+    // =========================================================================
+
+    private void callAgentWorkflowAPI(final String apiKey, final String task) {
+        isAiTyping = true;
+        tvStatus.setText("● Agent 运行中...");
+        tvStatus.setTextColor(0xFFE67E22);
+
+        final ChatMessage aiMsg = new ChatMessage("ai", "");
+        chatList.add(aiMsg);
+        chatAdapter.notifyDataSetChanged();
+        lvChat.setSelection(chatList.size() - 1);
+        
+        final long reqSessionId = currentSessionId;
+        final String selectedModel = sp.getString("deepseek_model", "deepseek-v4-flash");
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    int step = 0;
+                    boolean finished = false;
+                    JSONArray messages = new JSONArray();
+                    
+                    String prompt = "你是一个运行在原生Android端的工作流Agent。你具备以下实体权限：\n" +
+                        "A. TEXT_PROCESS (纯文本深度处理、翻译、总结)\n" +
+                        "B. READ_DEVICE (读取底层设备精确时间、RAM、电量状态)\n" +
+                        "C. ENCRYPT_SAVE (将指定内容进行AES物理加密并写入暗盒目录，必填参数: content)\n" +
+                        "D. SCRAPE_WEB (发起HTTP网络嗅探获取目标网页文本，必填参数: url)\n\n" +
+                        "你必须【严格且仅能】以 JSON 格式回应，格式定义如下：\n" +
+                        "{\n" +
+                        "  \"thought\": \"你分析当前局势与决定下一步的思考过程\",\n" +
+                        "  \"action\": \"从上述A/B/C/D中选择一个动作指令(如 READ_DEVICE)\",\n" +
+                        "  \"action_param\": \"该动作需要的字符串参数(若无则留空)\",\n" +
+                        "  \"is_finished\": false\n" +
+                        "}\n" +
+                        "当所有任务指标完成时，请将 action 设为 FINISH，is_finished 设为 true，并将最终汇总报告填入 action_param。\n" +
+                        "绝对禁止输出 markdown 标记或其他无关文字，仅输出合法的 JSON！";
+
+                    JSONObject sysMsg = new JSONObject();
+                    sysMsg.put("role", "system");
+                    sysMsg.put("content", prompt);
+                    messages.put(sysMsg);
+                    
+                    JSONObject userMsg = new JSONObject();
+                    userMsg.put("role", "user");
+                    userMsg.put("content", "目标任务: " + task);
+                    messages.put(userMsg);
+                    
+                    while (!finished && step < 12) { // 最大安全循环次数防溢出
+                        step++;
+                        final int currentStep = step;
+                        
+                        // 1. 同步呼叫 API
+                        String responseData = syncDeepSeekCall(apiKey, selectedModel, messages);
+                        
+                        // 2. 提取与解析 JSON
+                        String jsonStr = extractJsonFromText(responseData);
+                        JSONObject agentRes = new JSONObject(jsonStr);
+                        
+                        final String thought = agentRes.optString("thought", "无推演...");
+                        final String action = agentRes.optString("action", "TEXT_PROCESS");
+                        final String param = agentRes.optString("action_param", "");
+                        finished = agentRes.optBoolean("is_finished", false);
+                        
+                        // 3. 渲染日志到终端
+                        mainHandler.post(new Runnable() {
+                            public void run() {
+                                String log = "\n[Step " + currentStep + "] 🧠 思考: " + thought + "\n⚡ 执行动作: " + action;
+                                if (!param.isEmpty() && action.length() > 2) {
+                                    log += "\n🔗 参数挂载: " + (param.length() > 50 ? param.substring(0, 50) + "..." : param);
+                                }
+                                aiMsg.finalContent += log + "\n───";
+                                chatAdapter.notifyDataSetChanged();
+                                lvChat.setSelection(chatList.size() - 1);
+                            }
+                        });
+                        
+                        if (finished) {
+                            mainHandler.post(new Runnable() {
+                                public void run() {
+                                    aiMsg.finalContent += "\n\n✅ [工作流任务完结]\n" + param;
+                                    chatAdapter.notifyDataSetChanged();
+                                }
+                            });
+                            break;
+                        }
+                        
+                        // 4. 执行沙盒穿透 Action
+                        String actionResult = executeAgentAction(action, param);
+                        
+                        // 5. 封装上下文，推入下一次循环
+                        JSONObject astMsg = new JSONObject();
+                        astMsg.put("role", "assistant");
+                        astMsg.put("content", jsonStr);
+                        messages.put(astMsg);
+                        
+                        JSONObject resMsg = new JSONObject();
+                        resMsg.put("role", "user");
+                        resMsg.put("content", "系统底层执行结果回报:\n" + actionResult);
+                        messages.put(resMsg);
+                    }
+                    
+                    if (!finished) {
+                        mainHandler.post(new Runnable() {
+                            public void run() { aiMsg.finalContent += "\n\n❌ [安全阻断] 工作流循环次数超出上限，强制终止。"; chatAdapter.notifyDataSetChanged(); }
+                        });
+                    }
+                    
+                } catch (final Exception e) {
+                    mainHandler.post(new Runnable() {
+                        public void run() { aiMsg.finalContent += "\n\n❌ [引擎崩溃] 解析失败或网络异常: " + e.getMessage(); chatAdapter.notifyDataSetChanged(); }
+                    });
+                } finally {
+                    mainHandler.post(new Runnable() {
+                        public void run() {
+                            isAiTyping = false;
+                            tvStatus.setText("● 待命");
+                            tvStatus.setTextColor(0xFF27AE60);
+                            if (!aiMsg.finalContent.isEmpty()) {
+                                db.addChatMessage(reqSessionId, "ai", aiMsg.toRawString());
+                                refreshSessionList();
+                            }
+                        }
+                    });
+                }
+            }
+        }).start();
+    }
+
+    private String syncDeepSeekCall(String apiKey, String model, JSONArray messages) throws Exception {
+        URL url = new URL("https://api.deepseek.com/chat/completions");
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8");
+        conn.setRequestProperty("Authorization", "Bearer " + apiKey);
+        conn.setDoOutput(true);
+        conn.setDoInput(true);
+        conn.setConnectTimeout(20000);
+        conn.setReadTimeout(120000);
+        
+        JSONObject payload = new JSONObject();
+        payload.put("model", model);
+        payload.put("stream", false); // 状态机需要完整的 JSON 回应
+        
+        JSONObject format = new JSONObject();
+        format.put("type", "json_object");
+        payload.put("response_format", format); 
+        payload.put("messages", messages);
+        
+        OutputStream os = conn.getOutputStream();
+        os.write(payload.toString().getBytes("UTF-8"));
+        os.flush(); os.close();
+        
+        if (conn.getResponseCode() == 200) {
+            BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while((line = br.readLine()) != null) sb.append(line);
+            br.close();
+            JSONObject res = new JSONObject(sb.toString());
+            return res.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
+        } else {
+            throw new Exception("HTTP 拒绝状态码: " + conn.getResponseCode());
+        }
+    }
+
+    private String extractJsonFromText(String raw) {
+        if (raw == null) return "{}";
+        int start = raw.indexOf("{");
+        int end = raw.lastIndexOf("}");
+        if (start != -1 && end != -1 && end >= start) {
+            return raw.substring(start, end + 1);
+        }
+        return "{}";
+    }
+
+    private String executeAgentAction(String action, String param) {
+        if ("READ_DEVICE".equals(action)) {
+            long availRam = 0, totalRam = 0;
+            try {
+                android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
+                if (am != null) { am.getMemoryInfo(mi); availRam = mi.availMem / 1048576L; totalRam = mi.totalMem / 1048576L;}
+            } catch (Exception e) {}
+            
+            int batteryPct = -1;
+            try {
+                Intent batteryIntent = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+                if (batteryIntent != null) {
+                    int level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+                    int scale = batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+                    batteryPct = (int) (level * 100 / (float) scale);
+                }
+            } catch (Exception e) {}
+            
+            String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
+            return "设备时间: " + time + "\n剩余电量: " + batteryPct + "%\nRAM: 剩余 " + availRam + "MB / 总计 " + totalRam + "MB";
+            
+        } else if ("ENCRYPT_SAVE".equals(action)) {
+            try {
+                if (param == null || param.isEmpty()) return "操作失败：缺少需要加密的文本。";
+                File baseDir = new File(Environment.getExternalStorageDirectory(), "Download/.XiaoyuVault/Agent");
+                if (!baseDir.exists()) baseDir.mkdirs();
+                
+                String fileName = "Agent_Report_" + System.currentTimeMillis() + ".snt";
+                File outFile = new File(baseDir, fileName);
+                
+                // 调用物理加密引擎
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                byte[] key = digest.digest("xiaoyu_agent_master_key_2026".getBytes("UTF-8"));
+                SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
+                Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+                byte[] iv = new byte[16];
+                new SecureRandom().nextBytes(iv);
+                cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(iv));
+
+                FileOutputStream fos = new FileOutputStream(outFile);
+                fos.write(iv);
+                CipherOutputStream cos = new CipherOutputStream(fos, cipher);
+                cos.write(param.getBytes("UTF-8"));
+                cos.flush();
+                cos.close();
+                
+                return "加密成功。文件已物理固化至目录: " + outFile.getAbsolutePath();
+            } catch (Exception e) {
+                return "操作失败，系统抛出异常: " + e.getMessage();
+            }
+            
+        } else if ("SCRAPE_WEB".equals(action)) {
+            try {
+                if (param == null || param.isEmpty() || !param.startsWith("http")) return "操作失败：非法的 URL 参数。";
+                URL url = new URL(param);
+                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+                conn.setRequestMethod("GET");
+                conn.setConnectTimeout(8000);
+                conn.setReadTimeout(8000);
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) XiaoyuAgent");
+                
+                BufferedReader in = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                int count = 0;
+                // 限制读取行数防止 RAM 溢出
+                while ((line = in.readLine()) != null && count < 300) { 
+                    sb.append(line).append("\n");
+                    count++;
+                }
+                in.close();
+                String result = sb.toString();
+                // 限制字符串总长度避免模型崩溃
+                return "抓取成功。文档预览:\n" + (result.length() > 3000 ? result.substring(0, 3000) + "..." : result);
+            } catch (Exception e) {
+                return "爬虫失败: " + e.getMessage();
+            }
+            
+        } else if ("TEXT_PROCESS".equals(action)) {
+            return "文本已接收处理。请进行下一步逻辑判断。";
+        }
+        
+        return "警告：未知的执行指令 (" + action + ")，请检查指令集规范。";
+    }
+
+    // =========================================================================
+    // 🌐 标准对话流引擎 (SSE)
+    // =========================================================================
+
     private void callDeepSeekAPI(final String apiKey) {
         isAiTyping = true;
-        tvStatus.setText("● 運算中...");
+        tvStatus.setText("● 运算中...");
         tvStatus.setTextColor(0xFFE74C3C);
 
         final ChatMessage aiMsg = new ChatMessage("ai", "");
@@ -317,11 +639,11 @@ public class AiChatActivity extends Activity {
         } catch (Exception e) {}
 
         final StringBuilder sysPrompt = new StringBuilder();
-        sysPrompt.append("你是一個運行在移動端極客應用「小欲」中的終端神經網路。請保持專業、精簡的駭客風格回答。\n\n");
-        sysPrompt.append("【當前宿主設備物理狀態】\n");
-        sysPrompt.append("- 本地系統精確時間: ").append(currentTime).append("\n");
-        if (batteryPct != -1) sysPrompt.append("- 物理電池剩餘電量: ").append(batteryPct).append("%\n");
-        if (totalRam > 0) sysPrompt.append("- 記憶體(RAM)狀態: 剩餘 ").append(availRam).append("MB / 總共 ").append(totalRam).append("MB\n");
+        sysPrompt.append("你是一个运行在移动端极客应用「小欲」中的终端神经网络。请保持专业、精简的黑客风格回答。\n\n");
+        sysPrompt.append("【当前宿主设备物理状态】\n");
+        sysPrompt.append("- 本地系统精确时间: ").append(currentTime).append("\n");
+        if (batteryPct != -1) sysPrompt.append("- 物理电池剩余电量: ").append(batteryPct).append("%\n");
+        if (totalRam > 0) sysPrompt.append("- 内存(RAM)状态: 剩余 ").append(availRam).append("MB / 总共 ").append(totalRam).append("MB\n");
 
         new Thread(new Runnable() {
             @Override
@@ -348,7 +670,6 @@ public class AiChatActivity extends Activity {
                         payload.put("net", true);
                     }
                     
-                    // ⭐ 核心修復：V4 API 要求 thinking 必須是物件
                     if (isThinkMode) {
                         JSONObject thinkObj = new JSONObject();
                         thinkObj.put("type", "enabled");
@@ -392,33 +713,32 @@ public class AiChatActivity extends Activity {
                                     if (choices != null && choices.length() > 0) {
                                         JSONObject delta = choices.getJSONObject(0).optJSONObject("delta");
                                         
-                                        final StringBuilder chunkContent = new StringBuilder();
                                         if (delta != null) {
+                                            final StringBuilder chunkThink = new StringBuilder();
+                                            final StringBuilder chunkFinal = new StringBuilder();
+
                                             if (delta.has("reasoning_content") && !delta.isNull("reasoning_content")) {
                                                 String rc = delta.optString("reasoning_content", "");
                                                 if (!rc.isEmpty() && !rc.equals("null")) {
-                                                    if (aiMsg.content.isEmpty() || !aiMsg.content.contains("💡 深度推演中...")) {
-                                                        chunkContent.append("💡 深度推演中...\n");
-                                                    }
-                                                    chunkContent.append(rc);
+                                                    chunkThink.append(rc);
                                                 }
                                             }
                                             
                                             if (delta.has("content") && !delta.isNull("content")) {
                                                 String cStr = delta.optString("content", "");
                                                 if (!cStr.isEmpty() && !cStr.equals("null")) {
-                                                    if (!aiMsg.content.contains("───\n") && aiMsg.content.contains("💡 深度推演中...")) {
-                                                        chunkContent.append("\n\n───\n");
-                                                    }
-                                                    chunkContent.append(cStr);
+                                                    chunkFinal.append(cStr);
                                                 }
                                             }
                                             
-                                            if (chunkContent.length() > 0) {
+                                            if (chunkThink.length() > 0 || chunkFinal.length() > 0) {
+                                                final String newThink = chunkThink.toString();
+                                                final String newFinal = chunkFinal.toString();
                                                 mainHandler.post(new Runnable() {
                                                     @Override
                                                     public void run() {
-                                                        aiMsg.content += chunkContent.toString();
+                                                        aiMsg.thinkContent += newThink;
+                                                        aiMsg.finalContent += newFinal;
                                                         chatAdapter.notifyDataSetChanged();
                                                         lvChat.setSelection(chatList.size() - 1);
                                                     }
@@ -432,12 +752,12 @@ public class AiChatActivity extends Activity {
                     } else {
                         final String errorBody = readErrorStream(conn);
                         mainHandler.post(new Runnable() {
-                            @Override public void run() { aiMsg.content += "\n[API 拒絕連線: 狀態碼 " + responseCode + "]\n" + errorBody; }
+                            @Override public void run() { aiMsg.finalContent += "\n[API 拒绝连线: 状态码 " + responseCode + "]\n" + errorBody; }
                         });
                     }
                 } catch (final Exception e) {
                     mainHandler.post(new Runnable() {
-                        @Override public void run() { aiMsg.content += "\n[網路引擎崩潰: " + e.getMessage() + "]"; }
+                        @Override public void run() { aiMsg.finalContent += "\n[网络引擎崩溃: " + e.getMessage() + "]"; }
                     });
                 } finally {
                     if (reader != null) try { reader.close(); } catch (Exception e) {}
@@ -450,8 +770,8 @@ public class AiChatActivity extends Activity {
                             tvStatus.setText("● 待命");
                             tvStatus.setTextColor(0xFF27AE60);
                             chatAdapter.notifyDataSetChanged();
-                            if (!aiMsg.content.isEmpty()) {
-                                db.addChatMessage(reqSessionId, "ai", aiMsg.content);
+                            if (!aiMsg.thinkContent.isEmpty() || !aiMsg.finalContent.isEmpty()) {
+                                db.addChatMessage(reqSessionId, "ai", aiMsg.toRawString());
                                 refreshSessionList();
                             }
                         }
@@ -490,7 +810,7 @@ public class AiChatActivity extends Activity {
         } catch (Exception e) {}
     }
 
-    // --- UI 與本地邏輯 ---
+    // --- UI 与本地逻辑 ---
 
     private void showApiKeyDialog() {
         final EditText input = new EditText(this);
@@ -505,14 +825,14 @@ public class AiChatActivity extends Activity {
         container.addView(input, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         new AlertDialog.Builder(this)
-            .setTitle("⚙️ 部署 API 密鑰")
-            .setMessage("請輸入您的 DeepSeek API Key：")
+            .setTitle("⚙️ 部署 API 密钥")
+            .setMessage("请输入您的 DeepSeek API Key：")
             .setView(container)
-            .setPositiveButton("儲存", new DialogInterface.OnClickListener() {
+            .setPositiveButton("保存", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
                     sp.edit().putString("deepseek_api_key", input.getText().toString().trim()).apply();
-                    Toast.makeText(AiChatActivity.this, "密鑰已裝載", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(AiChatActivity.this, "密钥已装载", Toast.LENGTH_SHORT).show();
                 }
             }).setNegativeButton("取消", null).show();
     }
@@ -531,9 +851,9 @@ public class AiChatActivity extends Activity {
         container.addView(input, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         new AlertDialog.Builder(this)
-            .setTitle("📝 修改鏈路名稱")
+            .setTitle("📝 修改链路名称")
             .setView(container)
-            .setPositiveButton("儲存", new DialogInterface.OnClickListener() {
+            .setPositiveButton("保存", new DialogInterface.OnClickListener() {
                 @Override
                 public void onClick(DialogInterface dialog, int which) {
                     String newTitle = input.getText().toString().trim();
@@ -551,9 +871,9 @@ public class AiChatActivity extends Activity {
 
     private void confirmDeleteSession(final long targetId) {
         new AlertDialog.Builder(this)
-            .setTitle("銷毀鏈路")
-            .setMessage("確定要永久刪除此對話嗎？")
-            .setPositiveButton("刪除", new DialogInterface.OnClickListener() {
+            .setTitle("销毁链路")
+            .setMessage("确定要永久删除此对话吗？")
+            .setPositiveButton("删除", new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface dialog, int which) {
                     db.deleteSession(targetId);
                     refreshSessionList();
@@ -573,7 +893,7 @@ public class AiChatActivity extends Activity {
 
     private void createNewSession() {
         String timeStr = new SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(new Date());
-        currentSessionTitle = "新神經鏈路 " + timeStr;
+        currentSessionTitle = "新神经链路 " + timeStr;
         currentSessionId = db.createAiSession(currentSessionTitle);
         refreshSessionList();
         
@@ -606,9 +926,10 @@ public class AiChatActivity extends Activity {
     }
 
     private void addMessage(String role, String content, boolean saveToDb) {
-        chatList.add(new ChatMessage(role, content));
+        ChatMessage msg = new ChatMessage(role, content);
+        chatList.add(msg);
         if (saveToDb) {
-            db.addChatMessage(currentSessionId, role, content);
+            db.addChatMessage(currentSessionId, role, msg.toRawString());
             refreshSessionList(); 
         }
         chatAdapter.notifyDataSetChanged();
@@ -618,10 +939,53 @@ public class AiChatActivity extends Activity {
     private void openDrawer() { refreshSessionList(); layoutDrawer.setVisibility(View.VISIBLE); }
     private void closeDrawer() { layoutDrawer.setVisibility(View.GONE); }
 
-    // --- 資料結構與適配器 ---
+    // --- 数据结构与适配器 ---
     private class ChatMessage {
-        String role, content;
-        public ChatMessage(String role, String content) { this.role = role; this.content = content; }
+        String role;
+        String thinkContent = "";
+        String finalContent = "";
+        boolean isThinkVisible = false;
+
+        public ChatMessage(String role, String rawContent) { 
+            this.role = role;
+            parseContent(rawContent);
+        }
+
+        private void parseContent(String rawContent) {
+            if (rawContent == null || rawContent.isEmpty()) {
+                this.finalContent = "";
+                return;
+            }
+            String thinkPrefix = "💡 深度推演中...\n";
+            String separator = "\n\n───\n";
+            
+            if (rawContent.contains(thinkPrefix)) {
+                int start = rawContent.indexOf(thinkPrefix) + thinkPrefix.length();
+                int end = rawContent.indexOf(separator);
+                if (end != -1) {
+                    this.thinkContent = rawContent.substring(start, end);
+                    this.finalContent = rawContent.substring(end + separator.length());
+                } else {
+                    this.thinkContent = rawContent.substring(start);
+                    this.finalContent = "";
+                }
+            } else {
+                this.thinkContent = "";
+                this.finalContent = rawContent;
+            }
+        }
+
+        public String toRawString() {
+            StringBuilder sb = new StringBuilder();
+            if (!thinkContent.isEmpty()) {
+                sb.append("💡 深度推演中...\n").append(thinkContent);
+                if (!finalContent.isEmpty()) {
+                    sb.append("\n\n───\n");
+                }
+            }
+            sb.append(finalContent);
+            return sb.toString();
+        }
     }
 
     private class ChatAdapter extends BaseAdapter {
@@ -636,11 +1000,111 @@ public class AiChatActivity extends Activity {
             TextView tvAi = (TextView) convertView.findViewById(R.id.tv_ai_text);
             TextView tvUser = (TextView) convertView.findViewById(R.id.tv_user_text);
 
-            ChatMessage msg = chatList.get(position);
+            tvAi.setMovementMethod(LinkMovementMethod.getInstance());
+            tvAi.setHighlightColor(android.graphics.Color.TRANSPARENT);
+
+            tvUser.setMovementMethod(LinkMovementMethod.getInstance());
+            tvUser.setHighlightColor(android.graphics.Color.TRANSPARENT);
+
+            final int pos = position;
+            final ChatMessage msg = chatList.get(pos);
+
             if (msg.role.equals("ai")) {
-                layoutAi.setVisibility(View.VISIBLE); layoutUser.setVisibility(View.GONE); tvAi.setText(msg.content);
+                layoutAi.setVisibility(View.VISIBLE); 
+                layoutUser.setVisibility(View.GONE); 
+
+                SpannableStringBuilder ssb = new SpannableStringBuilder();
+                if (!msg.thinkContent.isEmpty()) {
+                    String toggleText = msg.isThinkVisible ? "▼ 收起思考过程\n\n" : "▶ 展开思考过程\n\n";
+                    if (msg.finalContent.isEmpty() && !msg.isThinkVisible) {
+                        toggleText = "▶ 展开思考过程 (推演中...)\n\n";
+                    }
+                    
+                    int startToggle = ssb.length();
+                    ssb.append(toggleText);
+                    int endToggle = ssb.length();
+                    
+                    ClickableSpan clickSpan = new ClickableSpan() {
+                        @Override
+                        public void onClick(View widget) {
+                            chatList.get(pos).isThinkVisible = !chatList.get(pos).isThinkVisible;
+                            notifyDataSetChanged();
+                        }
+                        @Override
+                        public void updateDrawState(TextPaint ds) {
+                            super.updateDrawState(ds);
+                            ds.setColor(0xFF8E44AD); 
+                            ds.setUnderlineText(false);
+                            ds.setFakeBoldText(true);
+                        }
+                    };
+                    ssb.setSpan(clickSpan, startToggle, endToggle, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    
+                    if (msg.isThinkVisible) {
+                        int startThink = ssb.length();
+                        ssb.append(msg.thinkContent);
+                        ssb.append("\n\n───\n\n");
+                        int endThink = ssb.length();
+                        
+                        ssb.setSpan(new ForegroundColorSpan(0xFF888888), startThink, endThink, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                        ssb.setSpan(new RelativeSizeSpan(0.85f), startThink, endThink, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    }
+                }
+                
+                ssb.append(msg.finalContent);
+
+                int startCopy = ssb.length();
+                ssb.append("\n\n[ 📋 复制内容 ]");
+                int endCopy = ssb.length();
+                
+                ClickableSpan copySpan = new ClickableSpan() {
+                    @Override
+                    public void onClick(View widget) {
+                        ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                        cb.setPrimaryClip(ClipData.newPlainText("AiChat", chatList.get(pos).toRawString()));
+                        Toast.makeText(AiChatActivity.this, "内容已安全复制", Toast.LENGTH_SHORT).show();
+                    }
+                    @Override
+                    public void updateDrawState(TextPaint ds) {
+                        super.updateDrawState(ds);
+                        ds.setColor(0xFF4A90E2); 
+                        ds.setUnderlineText(false);
+                        ds.setFakeBoldText(true);
+                    }
+                };
+                ssb.setSpan(copySpan, startCopy, endCopy, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+                tvAi.setText(ssb);
+
             } else {
-                layoutAi.setVisibility(View.GONE); layoutUser.setVisibility(View.VISIBLE); tvUser.setText(msg.content);
+                layoutAi.setVisibility(View.GONE); 
+                layoutUser.setVisibility(View.VISIBLE); 
+                
+                SpannableStringBuilder userSsb = new SpannableStringBuilder();
+                userSsb.append(msg.finalContent);
+
+                int startCopyUser = userSsb.length();
+                userSsb.append("\n\n[ 📋 复制内容 ]");
+                int endCopyUser = userSsb.length();
+                
+                ClickableSpan copyUserSpan = new ClickableSpan() {
+                    @Override
+                    public void onClick(View widget) {
+                        ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                        cb.setPrimaryClip(ClipData.newPlainText("UserChat", chatList.get(pos).finalContent));
+                        Toast.makeText(AiChatActivity.this, "内容已安全复制", Toast.LENGTH_SHORT).show();
+                    }
+                    @Override
+                    public void updateDrawState(TextPaint ds) {
+                        super.updateDrawState(ds);
+                        ds.setColor(0xFF4A90E2); 
+                        ds.setUnderlineText(false);
+                        ds.setFakeBoldText(true);
+                    }
+                };
+                userSsb.setSpan(copyUserSpan, startCopyUser, endCopyUser, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+
+                tvUser.setText(userSsb);
             }
             return convertView;
         }

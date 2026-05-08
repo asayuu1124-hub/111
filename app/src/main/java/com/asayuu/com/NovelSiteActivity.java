@@ -214,11 +214,11 @@ public class NovelSiteActivity extends Activity {
     private void executeDestructiveBlock(final WebView view) {
         view.stopLoading();
         String safeHtml = "<html><body style='background:#EDEDED; display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; font-family:sans-serif;'>" +
-                          "<h2 style='color:#E74C3C;'>🚫 已徹底摧毀跳轉腳本</h2>" +
-                          "<p style='color:#666; text-align:center;'>小欲已將該色情/博彩頁面從內存中抹除。<br><br>請點擊手機【返回鍵】繼續閱讀。</p>" +
+                          "<h2 style='color:#E74C3C;'>🚫 已彻底摧毁跳转脚本</h2>" +
+                          "<p style='color:#666; text-align:center;'>小欲已将该色情/博彩页面从内存中抹除。<br><br>请点击手机【返回键】继续阅读。</p>" +
                           "</body></html>";
         view.loadDataWithBaseURL(null, safeHtml, "text/html", "utf-8", null);
-        Toast.makeText(this, "觸發最高級別防護，DOM已銷毀", Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, "触发最高级别防护，DOM已销毁", Toast.LENGTH_SHORT).show();
     }
 
     private void initReaderControls() {
