@@ -63,7 +63,7 @@ public class MainActivity extends Activity {
         btnToSafeBox = (Button) findViewById(R.id.btn_to_safebox);
         btnToTextGen = (Button) findViewById(R.id.btn_to_text_gen);
         btnToCrypto = (Button) findViewById(R.id.btn_to_crypto);
-        btnToAiChat = (Button) findViewById(R.id.btn_to_ai_chat); // 绑定 AI 终端按钮
+        btnToAiChat = (Button) findViewById(R.id.btn_to_ai_chat); 
         btnBackLogin = (Button) findViewById(R.id.btn_back_login);
         btnExit = (Button) findViewById(R.id.btn_exit);
 
@@ -117,13 +117,35 @@ public class MainActivity extends Activity {
             });
         }
 
-        // 绑定 AI 终端跳转逻辑
         if (btnToAiChat != null) {
             btnToAiChat.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) {
                     startActivity(new Intent(MainActivity.this, AiChatActivity.class));
                 }
             });
+
+            // 动态注入新功能入口 (避免修改 XML)
+            try {
+                LinearLayout rootLayout = (LinearLayout) btnToAiChat.getParent();
+                Button btnToLanRadar = new Button(this);
+                btnToLanRadar.setText("📡 局 域 网 声 呐 与 微 型 服 务 器");
+                btnToLanRadar.setBackgroundResource(R.drawable.selector_neumorph_btn);
+                btnToLanRadar.setTextColor(android.graphics.Color.parseColor("#E67E22"));
+                btnToLanRadar.setTextSize(13f);
+                btnToLanRadar.setTypeface(null, android.graphics.Typeface.BOLD);
+                
+                float density = getResources().getDisplayMetrics().density;
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, Math.round(55 * density));
+                lp.topMargin = Math.round(15 * density);
+                rootLayout.addView(btnToLanRadar, rootLayout.indexOfChild(btnToAiChat) + 1, lp);
+                
+                btnToLanRadar.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        startActivity(new Intent(MainActivity.this, LanRadarActivity.class));
+                    }
+                });
+            } catch (Exception e) {}
         }
 
         findViewById(R.id.layout_clip_history).setOnClickListener(new View.OnClickListener() {

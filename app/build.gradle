@@ -13,3 +13,8 @@ android {
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
     }
 }
+
+dependencies {
+    // 强制声明编译 libs 目录下的所有 .jar 文件
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+}

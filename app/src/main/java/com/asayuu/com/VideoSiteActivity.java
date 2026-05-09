@@ -68,7 +68,6 @@ public class VideoSiteActivity extends Activity {
             }
         });
 
-        // 模块三：嗅探按钮点击事件
         btnSniff.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 if (!sniffedUrl.isEmpty()) showSniffDialog(sniffedUrl);
@@ -96,7 +95,6 @@ public class VideoSiteActivity extends Activity {
             public WebResourceResponse shouldInterceptRequest(WebView view, String url) {
                 String u = url.toLowerCase();
                 
-                // 模块三：嗅探核心逻辑
                 if (u.contains(".m3u8") || u.contains(".mp4")) {
                     final String detectedUrl = url;
                     runOnUiThread(new Runnable() {
@@ -222,6 +220,9 @@ public class VideoSiteActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (webViewLayout != null && webView != null) {
+            webViewLayout.removeView(webView);
+        }
         if (webView != null) {
             webView.loadDataWithBaseURL(null, "", "text/html", "utf-8", null);
             webView.clearHistory();

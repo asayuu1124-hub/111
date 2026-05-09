@@ -3,6 +3,8 @@ package com.asayuu.com;
 import android.app.ActivityManager;
 import android.app.Service;
 import android.content.*;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.graphics.PixelFormat;
 import android.net.TrafficStats;
 import android.os.*;
@@ -14,6 +16,7 @@ import java.io.*;
 import java.net.*;
 import javax.net.ssl.*;
 import java.security.cert.X509Certificate;
+import java.util.List;
 
 public class FloatingService extends Service {
     private WindowManager windowManager;
@@ -26,6 +29,7 @@ public class FloatingService extends Service {
     private EditText etInput;
     private TextView tvResult, tvToggle, tvShieldToggle, tvCounterMode;
     private TextView tvCpu, tvRam, tvRom, tvBattery, tvNetRx, tvNetTx;
+    private TextView tvTargetNet; // 动态注入：独立网速嗅探器
     private ImageView ivCopy;
     private SeekBar sbAlpha, sbShieldAlpha, sbShieldWindowAlpha, sbMonitorWindowAlpha, sbCounterWindowAlpha;
 
@@ -42,6 +46,9 @@ public class FloatingService extends Service {
     private long lastCpuTotal = 0, lastCpuIdle = 0;
     private int batteryLevel = -1;
     private float batteryTemp = -1;
+    
+    private int targetUid = -1;
+    private String targetAppName = "全局";
 
     // --- 主动告警状态机 ---
     private boolean isTempWarned = false;
@@ -67,29 +74,25 @@ public class FloatingService extends Service {
                 batteryTemp = temp / 10.0f;
             }
 
-            // 物理探针主动告警系统
             try {
                 Vibrator vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
                 
-                // 温控警告 (≥ 42°C)
                 if (batteryTemp >= 42.0f && !isTempWarned) {
                     isTempWarned = true;
                     if (vibrator != null) vibrator.vibrate(new long[]{0, 500, 200, 500}, -1);
                     Toast.makeText(context, "⚠️ 警告：设备温度过高 (" + batteryTemp + "°C)", Toast.LENGTH_LONG).show();
                 } else if (batteryTemp < 40.0f) {
-                    isTempWarned = false; // 降温后重置
+                    isTempWarned = false;
                 }
 
-                // 低电量警告 (≤ 15%)
                 if (batteryLevel <= 15 && !isLowBatteryWarned) {
                     isLowBatteryWarned = true;
                     if (vibrator != null) vibrator.vibrate(new long[]{0, 300, 100, 300}, -1);
                     Toast.makeText(context, "⚠️ 警告：电量极低 (" + batteryLevel + "%)", Toast.LENGTH_LONG).show();
                 } else if (batteryLevel > 20) {
-                    isLowBatteryWarned = false; // 充电后重置
+                    isLowBatteryWarned = false; 
                 }
 
-                // 满电提醒
                 if (batteryLevel == 100 && !isFullBatteryWarned) {
                     isFullBatteryWarned = true;
                     if (vibrator != null) vibrator.vibrate(500);
@@ -198,6 +201,33 @@ public class FloatingService extends Service {
         sbShieldWindowAlpha = (SeekBar) windowView.findViewById(R.id.sb_shield_window_alpha);
         sbMonitorWindowAlpha = (SeekBar) windowView.findViewById(R.id.sb_monitor_window_alpha);
         sbCounterWindowAlpha = (SeekBar) windowView.findViewById(R.id.sb_counter_window_alpha);
+
+        // --- 动态注入：独立包名网速嗅探控件 ---
+        try {
+            tvTargetNet = new TextView(this);
+            tvTargetNet.setText("🎯 测速目标: 全局 (点击锁定当前前台App)");
+            tvTargetNet.setTextColor(0xFF4A90E2);
+            tvTargetNet.setTextSize(12f);
+            tvTargetNet.setPadding(0, 15, 0, 0);
+            tvTargetNet.setGravity(Gravity.CENTER);
+            llMonitorCard.addView(tvTargetNet);
+
+            tvTargetNet.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    if (targetUid != -1) {
+                        targetUid = -1;
+                        targetAppName = "全局";
+                        tvTargetNet.setText("🎯 测速目标: 全局 (点击锁定当前前台App)");
+                        tvTargetNet.setTextColor(0xFF4A90E2);
+                        lastRx = TrafficStats.getTotalRxBytes();
+                        lastTx = TrafficStats.getTotalTxBytes();
+                    } else {
+                        lockForegroundAppNet();
+                    }
+                }
+            });
+        } catch (Exception e) {}
 
         initCounterMatrix();
 
@@ -340,6 +370,46 @@ public class FloatingService extends Service {
         windowView.findViewById(R.id.btn_drag).setOnTouchListener(new TouchListener(false));
     }
 
+    private void lockForegroundAppNet() {
+        try {
+            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+            if (Build.VERSION.SDK_INT >= 21) {
+                List<ActivityManager.RunningAppProcessInfo> pids = am.getRunningAppProcesses();
+                if (pids != null && !pids.isEmpty()) {
+                    for (ActivityManager.RunningAppProcessInfo processInfo : pids) {
+                        if (processInfo.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
+                            PackageManager pm = getPackageManager();
+                            ApplicationInfo ai = pm.getApplicationInfo(processInfo.processName, 0);
+                            targetUid = ai.uid;
+                            targetAppName = pm.getApplicationLabel(ai).toString();
+                            break;
+                        }
+                    }
+                }
+            } else {
+                List<ActivityManager.RunningTaskInfo> tasks = am.getRunningTasks(1);
+                if (tasks != null && !tasks.isEmpty()) {
+                    String pkg = tasks.get(0).topActivity.getPackageName();
+                    PackageManager pm = getPackageManager();
+                    ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
+                    targetUid = ai.uid;
+                    targetAppName = pm.getApplicationLabel(ai).toString();
+                }
+            }
+            
+            if (targetUid != -1) {
+                tvTargetNet.setText("🎯 锁定: " + targetAppName + " [解除]");
+                tvTargetNet.setTextColor(0xFFE67E22);
+                lastRx = TrafficStats.getUidRxBytes(targetUid);
+                lastTx = TrafficStats.getUidTxBytes(targetUid);
+            } else {
+                Toast.makeText(this, "获取前台应用失败", Toast.LENGTH_SHORT).show();
+            }
+        } catch (Exception e) {
+            Toast.makeText(this, "需要应用使用情况访问权限", Toast.LENGTH_SHORT).show();
+        }
+    }
+
     private void setWindowFocusable(boolean focusable) {
         if (windowView == null || windowView.getParent() == null) return;
         boolean isCurrentlyFocusable = (params.flags & WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE) == 0;
@@ -428,6 +498,7 @@ public class FloatingService extends Service {
         }
         resetCounter();
     }
+    
     private void updateCardUI(int i) {
         cardViews[i].setText(CARD_NAMES[i] + "\n[" + currentCounts[i] + "]");
         if (currentCounts[i] == 0) {
@@ -464,10 +535,10 @@ public class FloatingService extends Service {
     }
 
     private void updateMonitorStats() {
+        BufferedReader reader = null;
         try {
-            BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream("/proc/stat")), 1000);
+            reader = new BufferedReader(new InputStreamReader(new FileInputStream("/proc/stat")), 1000);
             String load = reader.readLine();
-            reader.close();
             String[] toks = load.split(" +");
             long idle = Long.parseLong(toks[4]);
             long total = 0;
@@ -477,13 +548,19 @@ public class FloatingService extends Service {
             if (lastCpuTotal != 0) {
                 long diffTotal = total - lastCpuTotal;
                 long diffIdle = idle - lastCpuIdle;
-                int cpuUsage = (int) ((diffTotal - diffIdle) * 100 / diffTotal);
-                tvCpu.setText("CPU 占用率: " + cpuUsage + "%");
+                if (diffTotal > 0) {
+                    int cpuUsage = (int) ((diffTotal - diffIdle) * 100 / diffTotal);
+                    tvCpu.setText("CPU 占用率: " + Math.min(100, Math.max(0, cpuUsage)) + "%");
+                }
             }
             lastCpuTotal = total;
             lastCpuIdle = idle;
         } catch (Exception e) {
             tvCpu.setText("CPU 占用率: 系统已限制读取");
+        } finally {
+            if (reader != null) {
+                try { reader.close(); } catch (Exception ex) {}
+            }
         }
 
         try {
@@ -516,25 +593,30 @@ public class FloatingService extends Service {
 
         if (batteryLevel != -1) {
             tvBattery.setText("电池状态: " + batteryLevel + "% | 温度: " + batteryTemp + "°C");
-            // 动态告警 UI 变色
             if (batteryTemp >= 42.0f || batteryLevel <= 15) {
-                tvBattery.setTextColor(0xFFE74C3C); // 警示红
+                tvBattery.setTextColor(0xFFE74C3C); 
             } else {
-                tvBattery.setTextColor(0xFF4E5D6A); // 原色
+                tvBattery.setTextColor(0xFF4E5D6A); 
             }
         }
 
         try {
-            long rx = TrafficStats.getTotalRxBytes();
-            long tx = TrafficStats.getTotalTxBytes();
-            if (lastRx != 0 || lastTx != 0) {
-                long rxSpeed = (rx - lastRx) / 1024;
-                long txSpeed = (tx - lastTx) / 1024;
-                tvNetRx.setText("下行速率: " + rxSpeed + " KB/s");
-                tvNetTx.setText("上行速率: " + txSpeed + " KB/s");
+            long rx = targetUid == -1 ? TrafficStats.getTotalRxBytes() : TrafficStats.getUidRxBytes(targetUid);
+            long tx = targetUid == -1 ? TrafficStats.getTotalTxBytes() : TrafficStats.getUidTxBytes(targetUid);
+            
+            if (rx == TrafficStats.UNSUPPORTED || tx == TrafficStats.UNSUPPORTED) {
+                tvNetRx.setText("下行速率: 接口受限");
+                tvNetTx.setText("上行速率: 接口受限");
+            } else {
+                if (lastRx != 0 || lastTx != 0) {
+                    long rxSpeed = (rx - lastRx) / 1024;
+                    long txSpeed = (tx - lastTx) / 1024;
+                    tvNetRx.setText("下行速率: " + Math.max(0, rxSpeed) + " KB/s");
+                    tvNetTx.setText("上行速率: " + Math.max(0, txSpeed) + " KB/s");
+                }
+                lastRx = rx;
+                lastTx = tx;
             }
-            lastRx = rx;
-            lastTx = tx;
         } catch (Exception e) {}
     }
 

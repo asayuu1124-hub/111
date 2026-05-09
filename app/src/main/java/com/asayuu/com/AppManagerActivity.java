@@ -38,7 +38,6 @@ public class AppManagerActivity extends Activity {
         title.setPadding(0, 20, 0, 20);
         root.addView(title);
 
-        // 🔍 新增：搜索功能输入框
         etSearch = new EditText(this);
         etSearch.setHint("🔍 输入应用名称或包名搜索...");
         etSearch.setBackgroundColor(Color.WHITE);
@@ -49,7 +48,6 @@ public class AppManagerActivity extends Activity {
         lpSearch.setMargins(0, 0, 0, 20);
         root.addView(etSearch, lpSearch);
 
-        // 🔍 新增：实时搜索过滤逻辑
         etSearch.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
             @Override public void onTextChanged(CharSequence s, int start, int before, int count) {}
@@ -96,6 +94,9 @@ public class AppManagerActivity extends Activity {
                         item.name = pi.applicationInfo.loadLabel(pm).toString();
                         item.pkg = pi.packageName;
                         item.path = pi.applicationInfo.sourceDir;
+                        if (Build.VERSION.SDK_INT >= 21) {
+                            item.splitPaths = pi.applicationInfo.splitSourceDirs;
+                        }
                         originalList.add(item);
                     }
                 }
@@ -123,7 +124,8 @@ public class AppManagerActivity extends Activity {
                 AppItem item = appList.get(p);
                 TextView t1 = (TextView) v.findViewById(android.R.id.text1);
                 TextView t2 = (TextView) v.findViewById(android.R.id.text2);
-                t1.setText(item.name); t1.setTextColor(Color.BLACK);
+                String badge = (item.splitPaths != null && item.splitPaths.length > 0) ? " [📦 Split-APKs]" : "";
+                t1.setText(item.name + badge); t1.setTextColor(Color.BLACK);
                 t2.setText(item.pkg); t2.setTextColor(Color.GRAY);
                 return v;
             }
@@ -140,30 +142,30 @@ public class AppManagerActivity extends Activity {
         new AsyncTask<Void, Void, String>() {
             @Override protected String doInBackground(Void... voids) {
                 try {
-                    File src = new File(item.path);
-                    
-                    // 🛠️ 核心修改：双重保险路径写入策略，绕过分区存储限制
-                    // 策略1：尝试写入系统的公共 Download 目录 (Android 推荐方式)
                     File outDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "XiaoyuBackup");
                     if (!outDir.exists() && !outDir.mkdirs()) {
-                        // 策略2：如果失败，强制写入应用专有的外部目录 (绝对不会被拦截，且无需额外权限)
                         outDir = new File(getExternalFilesDir(null), "Backup");
                         if (!outDir.exists() && !outDir.mkdirs()) {
                             return "致命错误: 您的手机完全锁死了写入权限";
                         }
                     }
                     
-                    // 清理应用名称中的特殊字符，避免引起文件系统崩溃
                     String safeName = item.name.replaceAll("[\\\\/:*?\"<>|]", "");
-                    File dst = new File(outDir, safeName + "_" + item.pkg + ".apk");
                     
-                    InputStream in = new FileInputStream(src);
-                    OutputStream out = new FileOutputStream(dst);
-                    byte[] buf = new byte[2048]; int len;
-                    while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
-                    in.close(); out.close();
-                    
-                    return "✅ 提取成功!\n路径: " + dst.getAbsolutePath();
+                    if (item.splitPaths != null && item.splitPaths.length > 0) {
+                        File splitDir = new File(outDir, safeName + "_" + item.pkg + "_APKs");
+                        if (!splitDir.exists()) splitDir.mkdirs();
+                        
+                        copyFile(new File(item.path), new File(splitDir, "base.apk"));
+                        for (int i = 0; i < item.splitPaths.length; i++) {
+                            copyFile(new File(item.splitPaths[i]), new File(splitDir, "split_" + i + ".apk"));
+                        }
+                        return "✅ 提取成功 (Split格式)!\n路径: " + splitDir.getAbsolutePath();
+                    } else {
+                        File dst = new File(outDir, safeName + "_" + item.pkg + ".apk");
+                        copyFile(new File(item.path), dst);
+                        return "✅ 提取成功!\n路径: " + dst.getAbsolutePath();
+                    }
                 } catch (Exception e) { 
                     return "❌ 提取失败: " + e.getMessage(); 
                 }
@@ -173,6 +175,14 @@ public class AppManagerActivity extends Activity {
             }
         }.execute();
     }
+    
+    private void copyFile(File src, File dst) throws IOException {
+        InputStream in = new FileInputStream(src);
+        OutputStream out = new FileOutputStream(dst);
+        byte[] buf = new byte[8192]; int len;
+        while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
+        in.close(); out.close();
+    }
 
-    static class AppItem { String name, pkg, path; }
+    static class AppItem { String name, pkg, path; String[] splitPaths; }
 }

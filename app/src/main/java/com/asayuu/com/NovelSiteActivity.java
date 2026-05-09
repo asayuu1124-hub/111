@@ -7,7 +7,6 @@ import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
-import android.webkit.JavascriptInterface;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -21,6 +20,11 @@ import android.widget.RelativeLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.select.Elements;
+
 import java.io.ByteArrayInputStream;
 
 public class NovelSiteActivity extends Activity {
@@ -30,7 +34,6 @@ public class NovelSiteActivity extends Activity {
     private LinearLayout webViewLayout;
     private Button btnStartImmersive;
 
-    // 沉浸阅读器组件
     private RelativeLayout layoutImmersive;
     private TextView tvReaderContent;
     private Button btnFontMinus, btnFontPlus, btnTheme, btnExitReader;
@@ -38,8 +41,6 @@ public class NovelSiteActivity extends Activity {
 
     private int currentTheme = 0; 
     private float currentTextSize = 18f;
-
-    // 🛡️ 核心：记录用户最后一次触控屏幕的时间，用于判断是否为"自动跳转"
     private long lastTouchTime = System.currentTimeMillis();
 
     private String[] adBlacklist = {
@@ -80,7 +81,6 @@ public class NovelSiteActivity extends Activity {
         btnTheme = (Button) findViewById(R.id.btn_reader_theme);
         btnExitReader = (Button) findViewById(R.id.btn_reader_exit);
 
-        // 🛡️ 注入触控监听，刷新活动时间
         webView.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -94,7 +94,7 @@ public class NovelSiteActivity extends Activity {
         btnStartImmersive.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                extractNovelContent();
+                extractNovelContentJsoup();
             }
         });
     }
@@ -108,79 +108,43 @@ public class NovelSiteActivity extends Activity {
         s.setLoadWithOverviewMode(true);
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
         s.setUserAgentString("Mozilla/5.0 (Linux; Android 10; Mobile Safari/537.36)");
-        
         s.setJavaScriptCanOpenWindowsAutomatically(false);
         s.setSupportMultipleWindows(false);
 
-        webView.addJavascriptInterface(new ReaderTool(), "ReaderTool");
-
         webView.setWebViewClient(new WebViewClient() {
-            
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, String url) {
-                return interceptResource(url);
-            }
-
-            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                if (android.os.Build.VERSION.SDK_INT >= 21) {
-                    return interceptResource(request.getUrl().toString());
-                }
-                return null;
-            }
-
-            private WebResourceResponse interceptResource(String url) {
                 if (isMalicious(url.toLowerCase())) {
                     return new WebResourceResponse("text/plain", "UTF-8", new ByteArrayInputStream("".getBytes()));
                 }
-                return null;
+                return super.shouldInterceptRequest(view, url);
             }
 
             @Override
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 if (isMalicious(url.toLowerCase())) {
-                    executeDestructiveBlock(view);
+                    view.stopLoading();
                     return;
                 }
-
-                // 🛡️ 防线一：拦截长延迟的后台暗跳 (距离上次触摸超过 3.5 秒)
                 if (System.currentTimeMillis() - lastTouchTime > 3500) {
                     view.stopLoading();
                     if (view.canGoBack()) view.goBack();
-                    Toast.makeText(NovelSiteActivity.this, "🛡️ 已静默拦截后台恶意暗跳", Toast.LENGTH_SHORT).show();
                     return;
                 }
-
                 super.onPageStarted(view, url, favicon);
             }
 
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
-                return interceptUrl(view, url);
-            }
-
-            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-                if (android.os.Build.VERSION.SDK_INT >= 21) {
-                    return interceptUrl(view, request.getUrl().toString());
-                }
-                return false;
-            }
-
-            private boolean interceptUrl(WebView view, String url) {
-                String u = url.toLowerCase();
-                if (!u.startsWith("http")) return true; 
-
-                if (isMalicious(u)) {
-                    executeDestructiveBlock(view);
+                if (!url.toLowerCase().startsWith("http")) return true; 
+                if (isMalicious(url.toLowerCase())) {
+                    view.stopLoading();
                     return true; 
                 }
-
-                // 🛡️ 防线二：拦截脚本触发的自动跳转 (距离上次触摸超过 2.5 秒)
                 if (System.currentTimeMillis() - lastTouchTime > 2500) {
                     view.stopLoading();
-                    Toast.makeText(NovelSiteActivity.this, "🛡️ 已拦截脚本自动跳转", Toast.LENGTH_SHORT).show();
                     return true;
                 }
-
                 return false; 
             }
 
@@ -209,16 +173,6 @@ public class NovelSiteActivity extends Activity {
             if (u.contains(adBlacklist[i])) return true;
         }
         return false;
-    }
-
-    private void executeDestructiveBlock(final WebView view) {
-        view.stopLoading();
-        String safeHtml = "<html><body style='background:#EDEDED; display:flex; justify-content:center; align-items:center; height:100vh; flex-direction:column; font-family:sans-serif;'>" +
-                          "<h2 style='color:#E74C3C;'>🚫 已彻底摧毁跳转脚本</h2>" +
-                          "<p style='color:#666; text-align:center;'>小欲已将该色情/博彩页面从内存中抹除。<br><br>请点击手机【返回键】继续阅读。</p>" +
-                          "</body></html>";
-        view.loadDataWithBaseURL(null, safeHtml, "text/html", "utf-8", null);
-        Toast.makeText(this, "触发最高级别防护，DOM已销毁", Toast.LENGTH_SHORT).show();
     }
 
     private void initReaderControls() {
@@ -282,58 +236,60 @@ public class NovelSiteActivity extends Activity {
         }
     }
 
-    private void extractNovelContent() {
-        Toast.makeText(this, "正在嗅探正文...", Toast.LENGTH_SHORT).show();
-        String js = "javascript:(function(){" +
-                    "var selectors = ['#content', '#chaptercontent', '#BookText', '.read_chapterDetail', '#nr_1', '#novelcontent', '.Readarea'];" +
-                    "var text = '';" +
-                    "for(var i=0; i<selectors.length; i++) {" +
-                    "   var el = document.querySelector(selectors[i]);" +
-                    "   if(el) {" +
-                    "       var html = el.innerHTML;" +
-                    "       html = html.replace(/<br\\s*[\\/]?>/gi, '\\n');" +
-                    "       html = html.replace(/&nbsp;/gi, ' ');" +
-                    "       var tmp = document.createElement('DIV');" +
-                    "       tmp.innerHTML = html;" +
-                    "       text = tmp.textContent || tmp.innerText || '';" +
-                    "       break;" +
-                    "   }" +
-                    "}" +
-                    "window.ReaderTool.processContent(text);" +
-                    "})()";
-        webView.loadUrl(js);
+    // 核心重构点：利用 Jsoup 在后臺線程直接解析目標 DOM，徹底避開 WebView 的內存陷阱
+    private void extractNovelContentJsoup() {
+        final String currentUrl = webView.getUrl();
+        if (currentUrl == null || currentUrl.isEmpty()) return;
+        
+        Toast.makeText(this, "启动 Jsoup 深度提取...", Toast.LENGTH_SHORT).show();
+        
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    Document doc = Jsoup.connect(currentUrl)
+                            .userAgent("Mozilla/5.0 (Linux; Android 10)")
+                            .timeout(10000)
+                            .get();
+                            
+                    // 物理抹除所有干擾節點
+                    doc.select("script, style, iframe, .ad, .footer, .header, nav, #adv").remove();
+                    
+                    // 針對中國大陸主流小說站點的特徵探測
+                    Elements contentElements = doc.select("#content, #chaptercontent, #BookText, .read_chapterDetail, #nr_1, #novelcontent, .Readarea");
+                    final String text = contentElements.isEmpty() ? doc.body().text() : contentElements.text();
+                    
+                    // 將純淨文本拋回 UI 線程
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (text.trim().isEmpty()) {
+                                Toast.makeText(NovelSiteActivity.this, "未能嗅探到有效正文，或当前处于目录页", Toast.LENGTH_SHORT).show();
+                            } else {
+                                tvReaderContent.setText(text.trim().replaceAll("　　", "\n\n"));
+                                webViewLayout.setVisibility(View.GONE);
+                                btnStartImmersive.setVisibility(View.GONE);
+                                layoutImmersive.setVisibility(View.VISIBLE);
+                                scrollReader.scrollTo(0, 0); 
+                            }
+                        }
+                    });
+                } catch (final Exception e) {
+                    runOnUiThread(new Runnable() {
+                        public void run() { Toast.makeText(NovelSiteActivity.this, "Jsoup 提取失败: " + e.getMessage(), Toast.LENGTH_SHORT).show(); }
+                    });
+                }
+            }
+        }).start();
     }
 
-    // 🛡️ 终极物理销毁：不但隐藏广告，还把所有会作妖的 iframe 连根拔起
     private void injectCleanerJs(WebView view) {
         String js = "javascript:(function() {" +
                     "   var style = document.createElement('style');" +
                     "   style.innerHTML = 'iframe, .footer, .bottom-ad, .header, .nav, .ad-box, #adv { display: none !important; }';" +
                     "   document.head.appendChild(style);" +
-                    "   var frames = document.getElementsByTagName('iframe');" +
-                    "   for(var i=frames.length-1; i>=0; i--) { frames[i].parentNode.removeChild(frames[i]); }" +
                     "})()";
         view.loadUrl(js);
-    }
-
-    class ReaderTool {
-        @JavascriptInterface
-        public void processContent(final String text) {
-            runOnUiThread(new Runnable() {
-                @Override
-                public void run() {
-                    if (text == null || text.trim().isEmpty()) {
-                        Toast.makeText(NovelSiteActivity.this, "未能嗅探到有效正文，或当前在目录页", Toast.LENGTH_SHORT).show();
-                    } else {
-                        tvReaderContent.setText(text.trim());
-                        webViewLayout.setVisibility(View.GONE);
-                        btnStartImmersive.setVisibility(View.GONE);
-                        layoutImmersive.setVisibility(View.VISIBLE);
-                        scrollReader.scrollTo(0, 0); 
-                    }
-                }
-            });
-        }
     }
 
     @Override
@@ -353,6 +309,9 @@ public class NovelSiteActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (webViewLayout != null && webView != null) {
+            webViewLayout.removeView(webView);
+        }
         if (webView != null) {
             webView.loadDataWithBaseURL(null, "", "text/html", "utf-8", null);
             webView.clearHistory();
