@@ -19,14 +19,25 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileNotFoundException;
 import java.net.InetAddress;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+
+import javax.crypto.Cipher;
+import javax.crypto.CipherOutputStream;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
 
 // 【核心修复】：更正了物理引用的包名，并显式导入引擎的内部核心类
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoHTTPD.IHTTPSession;
+import fi.iki.elonen.NanoHTTPD.Method;
 import fi.iki.elonen.NanoHTTPD.Response;
 
 public class LanRadarActivity extends Activity {
@@ -86,7 +97,8 @@ public class LanRadarActivity extends Activity {
         root.addView(scroll, lpScroll);
         setContentView(root);
 
-        threadPool = Executors.newFixedThreadPool(20); // 维持 20 个并发探针
+        // 强行锁死为 8 个物理级并发探针，执行绝对防御 OOM 策略
+        threadPool = Executors.newFixedThreadPool(8);
 
         btnStartServer.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
@@ -188,6 +200,35 @@ public class LanRadarActivity extends Activity {
         super.onDestroy();
     }
 
+    // --- 盲收敛 AES 加密引擎 ---
+    private void encryptFileBlindly(File inFile, File outFile) throws Exception {
+        String deviceId = android.provider.Settings.Secure.getString(getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
+        if (deviceId == null) deviceId = "xiaoyu_fallback_id";
+        
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] key = digest.digest((deviceId + "_xiaoyu_blind_drop").getBytes("UTF-8"));
+        SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
+        
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        byte[] iv = new byte[16];
+        new SecureRandom().nextBytes(iv);
+        cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(iv));
+
+        FileOutputStream fos = new FileOutputStream(outFile);
+        fos.write(iv);
+        CipherOutputStream cos = new CipherOutputStream(fos, cipher);
+        
+        FileInputStream fis = new FileInputStream(inFile);
+        byte[] b = new byte[8192];
+        int d;
+        while ((d = fis.read(b)) != -1) {
+            cos.write(b, 0, d);
+        }
+        cos.flush();
+        cos.close();
+        fis.close();
+    }
+
     // --- NanoHTTPD 微型引擎 ---
     private class XiaoyuServer extends NanoHTTPD {
         public XiaoyuServer(int port) {
@@ -196,26 +237,74 @@ public class LanRadarActivity extends Activity {
 
         @Override
         public Response serve(IHTTPSession session) {
+            Method method = session.getMethod();
+            if (Method.POST.equals(method)) {
+                try {
+                    Map<String, String> files = new HashMap<String, String>();
+                    session.parseBody(files);
+                    String tempFilePath = files.get("uploadFile");
+                    
+                    if (tempFilePath != null) {
+                        File tempFile = new File(tempFilePath);
+                        if (tempFile.exists()) {
+                            File dropDir = new File(Environment.getExternalStorageDirectory(), "Download/.XiaoyuVault/WebDrop");
+                            if (!dropDir.exists()) dropDir.mkdirs();
+                            
+                            String originalName = session.getParms().get("uploadFile");
+                            if (originalName == null || originalName.trim().isEmpty()) {
+                                originalName = "WebDrop_Push_" + System.currentTimeMillis();
+                            }
+                            
+                            File outFile = new File(dropDir, originalName + ".snt");
+                            encryptFileBlindly(tempFile, outFile);
+                            
+                            mainHandler.post(new Runnable() {
+                                @Override public void run() {
+                                    appendLog("📥 盲收敛: 收到远端文件，已加密落盘至暗盒 WebDrop 目录。");
+                                }
+                            });
+                            
+                            StringBuilder res = new StringBuilder("<html><head><meta charset='utf-8'><title>上传成功</title></head>");
+                            res.append("<body style='font-family:sans-serif; padding:20px; background:#f4f4f4;'>");
+                            res.append("<h2 style='color:#27AE60;'>✅ 物理穿透推送成功</h2>");
+                            res.append("<p>文件已被局域网探针拦截并加密收敛至宿主机暗盒。</p>");
+                            res.append("<a href='/'>[ 返回控制台 ]</a>");
+                            res.append("</body></html>");
+                            return newFixedLengthResponse(Response.Status.OK, "text/html", res.toString());
+                        }
+                    }
+                } catch (Exception e) {
+                    return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "上传失败或物理拦截异常: " + e.getMessage());
+                }
+            }
+
             File exportDir = new File(Environment.getExternalStorageDirectory(), "Download/XiaoyuExport");
             if (!exportDir.exists()) exportDir.mkdirs();
 
             String uri = session.getUri();
             if (uri.equals("/")) {
-                StringBuilder html = new StringBuilder("<html><head><meta charset='utf-8'><title>小欲数据中枢</title></head>");
+                StringBuilder html = new StringBuilder("<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>小欲数据中枢</title></head>");
                 html.append("<body style='font-family:sans-serif; padding:20px; background:#f4f4f4;'>");
                 html.append("<h2 style='color:#333;'>📁 物理导出舱 (XiaoyuExport)</h2><hr>");
-                File[] files = exportDir.listFiles();
-                if (files != null && files.length > 0) {
+                File[] filesArr = exportDir.listFiles();
+                if (filesArr != null && filesArr.length > 0) {
                     html.append("<ul>");
-                    for (File f : files) {
+                    for (File f : filesArr) {
                         if (f.isFile()) {
-                            html.append("<li><a href='/download?file=").append(f.getName()).append("'>").append(f.getName()).append("</a></li>");
+                            html.append("<li style='margin-bottom:10px;'><a href='/download?file=").append(f.getName()).append("' style='color:#2980B9; text-decoration:none;'>").append(f.getName()).append("</a></li>");
                         }
                     }
                     html.append("</ul>");
                 } else {
-                    html.append("<p>当前没有任何已解密导出的文件。</p>");
+                    html.append("<p style='color:#888;'>当前没有任何已解密导出的文件。</p>");
                 }
+
+                html.append("<br><br><h2 style='color:#333;'>📤 全双工盲收敛推送 (自动加密落入暗盒)</h2><hr>");
+                html.append("<form method='POST' enctype='multipart/form-data' action='/'>");
+                html.append("<input type='file' name='uploadFile' style='margin-bottom:15px;'><br>");
+                html.append("<input type='submit' value=' 执 行 物 理 推 送 ' style='padding:10px 20px; background:#4A90E2; color:white; border:none; border-radius:5px; font-weight:bold;'>");
+                html.append("</form>");
+
                 html.append("</body></html>");
                 return newFixedLengthResponse(Response.Status.OK, "text/html", html.toString());
             } else if (uri.startsWith("/download")) {

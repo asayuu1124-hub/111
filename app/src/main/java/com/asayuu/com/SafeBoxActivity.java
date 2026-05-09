@@ -14,6 +14,7 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.AsyncTask;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
@@ -24,6 +25,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -43,6 +45,12 @@ import javax.crypto.CipherInputStream;
 import javax.crypto.CipherOutputStream;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
+
+import okio.BufferedSink;
+import okio.BufferedSource;
+import okio.Okio;
+import okio.Sink;
+import okio.Source;
 
 public class SafeBoxActivity extends Activity {
 
@@ -218,6 +226,30 @@ public class SafeBoxActivity extends Activity {
         adapter.notifyDataSetChanged();
     }
 
+    private Dialog createLoadingDialog(Context context, String msg) {
+        Dialog dialog = new Dialog(context);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setCancelable(false);
+        dialog.setCanceledOnTouchOutside(false);
+        LinearLayout layout = new LinearLayout(context);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(50, 50, 50, 50);
+        layout.setGravity(Gravity.CENTER);
+        layout.setBackgroundResource(R.drawable.nm_card_bg);
+        ProgressBar pb = new ProgressBar(context);
+        layout.addView(pb);
+        TextView tv = new TextView(context);
+        tv.setText(msg);
+        tv.setTextColor(0xFF333333);
+        tv.setPadding(0, 30, 0, 0);
+        layout.addView(tv);
+        dialog.setContentView(layout);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+        return dialog;
+    }
+
     private void showAddNoteDialog() {
         final Dialog dialog = new Dialog(this);
         LinearLayout layout = new LinearLayout(this);
@@ -294,18 +326,39 @@ public class SafeBoxActivity extends Activity {
                 .setMessage("是否将此文件解密并导出至 Download/XiaoyuExport 目录？")
                 .setPositiveButton("导出", new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface dialog, int which) {
-                        try {
-                            File exportDir = new File(Environment.getExternalStorageDirectory(), "Download/XiaoyuExport");
-                            if (!exportDir.exists()) exportDir.mkdirs();
-                            File exportedFile = new File(exportDir, file.getName());
-                            decryptFileToFile(file, exportedFile, currentPassword);
-                            Toast.makeText(SafeBoxActivity.this, "导出成功: " + exportedFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
-                        } catch (Exception e) {
-                            Toast.makeText(SafeBoxActivity.this, "导出失败", Toast.LENGTH_SHORT).show();
-                        }
+                        File exportDir = new File(Environment.getExternalStorageDirectory(), "Download/XiaoyuExport");
+                        if (!exportDir.exists()) exportDir.mkdirs();
+                        File exportedFile = new File(exportDir, file.getName());
+                        executeExportTask(file, exportedFile);
                     }
                 }).setNegativeButton("取消", null).show();
         }
+    }
+
+    private void executeExportTask(final File inFile, final File outFile) {
+        new AsyncTask<Void, Void, Boolean>() {
+            Dialog loadingDialog;
+            @Override protected void onPreExecute() {
+                loadingDialog = createLoadingDialog(SafeBoxActivity.this, "AES 流式解密導出中, 請勿操作...");
+                loadingDialog.show();
+            }
+            @Override protected Boolean doInBackground(Void... voids) {
+                try {
+                    decryptFileToFile(inFile, outFile, currentPassword);
+                    return true;
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+            @Override protected void onPostExecute(Boolean success) {
+                if (loadingDialog != null && loadingDialog.isShowing()) loadingDialog.dismiss();
+                if (success) {
+                    Toast.makeText(SafeBoxActivity.this, "导出成功: " + outFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(SafeBoxActivity.this, "导出失败", Toast.LENGTH_SHORT).show();
+                }
+            }
+        }.execute();
     }
 
     private void showNoteContentDialog(final String title, final String content) {
@@ -334,7 +387,6 @@ public class SafeBoxActivity extends Activity {
         
         layout.addView(scroll, scrollLp);
 
-        // 新增的水平按钮列：一键复制与阅毕
         LinearLayout btnLayout = new LinearLayout(this);
         btnLayout.setOrientation(LinearLayout.HORIZONTAL);
         LinearLayout.LayoutParams btnLayoutLp = new LinearLayout.LayoutParams(-1, 150);
@@ -360,7 +412,6 @@ public class SafeBoxActivity extends Activity {
         dialog.setContentView(layout);
         if (dialog.getWindow() != null) dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
         
-        // 剪贴板逻辑注入
         btnCopy.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -397,18 +448,39 @@ public class SafeBoxActivity extends Activity {
                 @Override public void onClick(DialogInterface dialog, int which) {
                     String name = input.getText().toString();
                     if (!name.isEmpty()) {
-                        try {
-                            InputStream is = getContentResolver().openInputStream(uri);
-                            File outFile = new File(currentVaultDir, name);
-                            encryptStreamToFile(is, outFile, currentPassword);
-                            loadFiles();
-                            Toast.makeText(SafeBoxActivity.this, "导入成功", Toast.LENGTH_SHORT).show();
-                        } catch (Exception e) {
-                            Toast.makeText(SafeBoxActivity.this, "导入失败", Toast.LENGTH_SHORT).show();
-                        }
+                        File outFile = new File(currentVaultDir, name);
+                        executeImportTask(uri, outFile);
                     }
                 }
             }).setNegativeButton("取消", null).show();
+    }
+
+    private void executeImportTask(final Uri uri, final File outFile) {
+        new AsyncTask<Void, Void, Boolean>() {
+            Dialog loadingDialog;
+            @Override protected void onPreExecute() {
+                loadingDialog = createLoadingDialog(SafeBoxActivity.this, "AES 流式加密導入中, 請勿操作...");
+                loadingDialog.show();
+            }
+            @Override protected Boolean doInBackground(Void... voids) {
+                try {
+                    InputStream is = getContentResolver().openInputStream(uri);
+                    encryptStreamToFile(is, outFile, currentPassword);
+                    return true;
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+            @Override protected void onPostExecute(Boolean success) {
+                if (loadingDialog != null && loadingDialog.isShowing()) loadingDialog.dismiss();
+                if (success) {
+                    loadFiles();
+                    Toast.makeText(SafeBoxActivity.this, "导入成功", Toast.LENGTH_SHORT).show();
+                } else {
+                    Toast.makeText(SafeBoxActivity.this, "导入失败", Toast.LENGTH_SHORT).show();
+                }
+            }
+        }.execute();
     }
 
     // --- 底层加密引擎 ---
@@ -456,14 +528,17 @@ public class SafeBoxActivity extends Activity {
         FileOutputStream fos = new FileOutputStream(outFile);
         fos.write(iv);
         CipherOutputStream cos = new CipherOutputStream(fos, cipher);
-        byte[] b = new byte[8192];
-        int d;
-        while ((d = is.read(b)) != -1) {
-            cos.write(b, 0, d);
-        }
-        cos.flush();
-        cos.close();
-        is.close();
+        
+        Source source = Okio.source(is);
+        Sink sink = Okio.sink(cos);
+        BufferedSource bufferedSource = Okio.buffer(source);
+        BufferedSink bufferedSink = Okio.buffer(sink);
+        
+        bufferedSink.writeAll(bufferedSource);
+        
+        bufferedSink.flush();
+        bufferedSink.close();
+        bufferedSource.close();
     }
 
     private byte[] decryptFileToBytes(File inFile, String password) throws Exception {
@@ -495,14 +570,17 @@ public class SafeBoxActivity extends Activity {
 
         CipherInputStream cis = new CipherInputStream(fis, cipher);
         FileOutputStream fos = new FileOutputStream(outFile);
-        byte[] b = new byte[8192];
-        int d;
-        while ((d = cis.read(b)) != -1) {
-            fos.write(b, 0, d);
-        }
-        fos.flush();
-        fos.close();
-        cis.close();
+        
+        Source source = Okio.source(cis);
+        Sink sink = Okio.sink(fos);
+        BufferedSource bufferedSource = Okio.buffer(source);
+        BufferedSink bufferedSink = Okio.buffer(sink);
+        
+        bufferedSink.writeAll(bufferedSource);
+        
+        bufferedSink.flush();
+        bufferedSink.close();
+        bufferedSource.close();
     }
 
     private void resizeDialog(Dialog dialog) {

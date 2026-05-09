@@ -1,6 +1,8 @@
 package com.asayuu.com;
 
 import android.app.Activity;
+import android.app.Dialog;
+import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -12,6 +14,12 @@ import android.view.*;
 import android.widget.*;
 import java.io.*;
 import java.util.*;
+
+import okio.BufferedSink;
+import okio.BufferedSource;
+import okio.Okio;
+import okio.Sink;
+import okio.Source;
 
 public class AppManagerActivity extends Activity {
     private ListView listView;
@@ -138,8 +146,37 @@ public class AppManagerActivity extends Activity {
         });
     }
 
+    private Dialog createLoadingDialog(Context context, String msg) {
+        Dialog dialog = new Dialog(context);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setCancelable(false);
+        dialog.setCanceledOnTouchOutside(false);
+        LinearLayout layout = new LinearLayout(context);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(50, 50, 50, 50);
+        layout.setGravity(Gravity.CENTER);
+        layout.setBackgroundColor(Color.parseColor("#F0F0F0"));
+        ProgressBar pb = new ProgressBar(context);
+        layout.addView(pb);
+        TextView tv = new TextView(context);
+        tv.setText(msg);
+        tv.setTextColor(Color.parseColor("#333333"));
+        tv.setPadding(0, 30, 0, 0);
+        layout.addView(tv);
+        dialog.setContentView(layout);
+        if (dialog.getWindow() != null) {
+            dialog.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+        }
+        return dialog;
+    }
+
     private void extractApk(final AppItem item) {
         new AsyncTask<Void, Void, String>() {
+            Dialog loadingDialog;
+            @Override protected void onPreExecute() {
+                loadingDialog = createLoadingDialog(AppManagerActivity.this, "高速流提取落盘中, 请勿操作...");
+                loadingDialog.show();
+            }
             @Override protected String doInBackground(Void... voids) {
                 try {
                     File outDir = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "XiaoyuBackup");
@@ -171,17 +208,23 @@ public class AppManagerActivity extends Activity {
                 }
             }
             @Override protected void onPostExecute(String resultMsg) {
+                if (loadingDialog != null && loadingDialog.isShowing()) {
+                    loadingDialog.dismiss();
+                }
                 Toast.makeText(AppManagerActivity.this, resultMsg, Toast.LENGTH_LONG).show();
             }
         }.execute();
     }
     
     private void copyFile(File src, File dst) throws IOException {
-        InputStream in = new FileInputStream(src);
-        OutputStream out = new FileOutputStream(dst);
-        byte[] buf = new byte[8192]; int len;
-        while ((len = in.read(buf)) > 0) out.write(buf, 0, len);
-        in.close(); out.close();
+        Source source = Okio.source(src);
+        Sink sink = Okio.sink(dst);
+        BufferedSource bufferedSource = Okio.buffer(source);
+        BufferedSink bufferedSink = Okio.buffer(sink);
+        bufferedSink.writeAll(bufferedSource);
+        bufferedSink.flush();
+        bufferedSink.close();
+        bufferedSource.close();
     }
 
     static class AppItem { String name, pkg, path; String[] splitPaths; }

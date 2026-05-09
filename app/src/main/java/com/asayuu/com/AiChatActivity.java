@@ -36,7 +36,6 @@ import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-// 引入第三方工业级引擎
 import okhttp3.MediaType;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
@@ -97,7 +96,6 @@ public class AiChatActivity extends Activity {
     private boolean isSearchMode = false;
     private boolean isAgentMode = false;
 
-    // 构建全局单例级别的 OkHttpClient，自动管理连接池与并发
     private final OkHttpClient okHttpClient = new OkHttpClient.Builder()
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(180, TimeUnit.SECONDS)
@@ -242,6 +240,11 @@ public class AiChatActivity extends Activity {
                 
                 String text = etInput.getText().toString().trim();
                 if (!text.isEmpty()) {
+                    if (checkLocalIntentInterception(text)) {
+                        etInput.setText("");
+                        return;
+                    }
+
                     addMessage("user", text, true);
                     etInput.setText("");
                     
@@ -284,6 +287,157 @@ public class AiChatActivity extends Activity {
                 return true;
             }
         });
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        saveSlidingWindow();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        restoreSlidingWindow();
+    }
+
+    private void saveSlidingWindow() {
+        if (chatList.isEmpty()) return;
+        try {
+            JSONArray arr = new JSONArray();
+            int start = Math.max(0, chatList.size() - 40); 
+            for (int i = start; i < chatList.size(); i++) {
+                ChatMessage msg = chatList.get(i);
+                JSONObject obj = new JSONObject();
+                obj.put("role", msg.role);
+                obj.put("content", msg.toRawString());
+                arr.put(obj);
+            }
+            
+            File cacheFile = new File(getExternalFilesDir(null), ".chat_cache_v9");
+            
+            String deviceId = android.provider.Settings.Secure.getString(getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
+            if (deviceId == null) deviceId = "xiaoyu_fallback_id";
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] key = digest.digest((deviceId + "_xiaoyu_sliding_window").getBytes("UTF-8"));
+            SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            byte[] iv = new byte[16];
+            new SecureRandom().nextBytes(iv);
+            cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(iv));
+
+            FileOutputStream fos = new FileOutputStream(cacheFile);
+            fos.write(iv);
+            CipherOutputStream cos = new CipherOutputStream(fos, cipher);
+            cos.write(arr.toString().getBytes("UTF-8"));
+            cos.flush();
+            cos.close();
+        } catch (Exception e) {}
+    }
+
+    private void restoreSlidingWindow() {
+        try {
+            File cacheFile = new File(getExternalFilesDir(null), ".chat_cache_v9");
+            if (!cacheFile.exists()) return;
+            
+            String deviceId = android.provider.Settings.Secure.getString(getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
+            if (deviceId == null) deviceId = "xiaoyu_fallback_id";
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] key = digest.digest((deviceId + "_xiaoyu_sliding_window").getBytes("UTF-8"));
+            SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
+            
+            FileInputStream fis = new FileInputStream(cacheFile);
+            byte[] iv = new byte[16];
+            fis.read(iv);
+            Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+            cipher.init(Cipher.DECRYPT_MODE, keySpec, new IvParameterSpec(iv));
+            
+            java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+            byte[] b = new byte[8192];
+            int d;
+            javax.crypto.CipherInputStream cis = new javax.crypto.CipherInputStream(fis, cipher);
+            while ((d = cis.read(b)) != -1) {
+                baos.write(b, 0, d);
+            }
+            cis.close();
+            
+            if (chatList.isEmpty()) {
+                String jsonStr = new String(baos.toByteArray(), "UTF-8");
+                JSONArray arr = new JSONArray(jsonStr);
+                for (int i = 0; i < arr.length(); i++) {
+                    JSONObject obj = arr.getJSONObject(i);
+                    chatList.add(new ChatMessage(obj.getString("role"), obj.getString("content")));
+                }
+                chatAdapter.notifyDataSetChanged();
+                if (chatList.size() > 0) lvChat.setSelection(chatList.size() - 1);
+            }
+            
+            cacheFile.delete();
+        } catch (Exception e) {}
+    }
+
+    private boolean checkLocalIntentInterception(final String text) {
+        if (text.matches(".*(打开|启动|进入).*(雷达|声呐|局域网|探针).*")) {
+            interceptAndLaunch("检测到局域网指令，正在强行打通物理雷达链路...", LanRadarActivity.class);
+            return true;
+        } else if (text.matches(".*(打开|启动|进入).*(暗盒|私密|保险箱).*")) {
+            interceptAndLaunch("检测到暗盒召唤指令，正在下潜至物理安全层...", SafeBoxActivity.class);
+            return true;
+        } else if (text.matches(".*(打开|启动|进入).*(提取|立方|应用).*")) {
+            interceptAndLaunch("检测到提取指令，正在挂载立方提取器...", AppManagerActivity.class);
+            return true;
+        } else if (text.matches(".*(打开|启动|测速|嗅探|温控).*(悬浮窗|前台).*")) {
+            interceptAndLaunch("检测到防窥与测速锁定指令，注入悬浮装甲中...", null); 
+            return true;
+        } else if (text.matches(".*(定时|守护|后台|唤醒|静默).*(任务|工作流|Agent|巡检).*")) {
+            interceptAndLaunch("检测到定时守护指令，已触发绝对前台保活机制，AlarmManager 将于 10 秒后执行后台巡检与盲收敛...", AgentService.class);
+            return true;
+        }
+        return false;
+    }
+
+    private void interceptAndLaunch(final String msgStr, final Class<?> targetActivity) {
+        addMessage("user", etInput.getText().toString().trim(), true);
+        final ChatMessage aiMsg = new ChatMessage("ai", "");
+        chatList.add(aiMsg);
+        chatAdapter.notifyDataSetChanged();
+        lvChat.setSelection(chatList.size() - 1);
+        
+        mainHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                aiMsg.finalContent = "⚡ [本地意图物理拦截]\n" + msgStr;
+                aiMsg.invalidateCache();
+                chatAdapter.notifyDataSetChanged();
+                db.addChatMessage(currentSessionId, "ai", aiMsg.toRawString());
+                refreshSessionList();
+                
+                if (targetActivity != null) {
+                    if (android.app.Service.class.isAssignableFrom(targetActivity)) {
+                        android.app.AlarmManager am = (android.app.AlarmManager) getSystemService(Context.ALARM_SERVICE);
+                        Intent intent = new Intent(AiChatActivity.this, targetActivity);
+                        int flags = 134217728; // FLAG_UPDATE_CURRENT
+                        if (android.os.Build.VERSION.SDK_INT >= 23) {
+                            flags |= 67108864; // FLAG_IMMUTABLE
+                        }
+                        android.app.PendingIntent pi = android.app.PendingIntent.getService(AiChatActivity.this, 0, intent, flags);
+                        
+                        long triggerTime = System.currentTimeMillis() + 10000;
+                        if (android.os.Build.VERSION.SDK_INT >= 23) {
+                            am.setExactAndAllowWhileIdle(android.app.AlarmManager.RTC_WAKEUP, triggerTime, pi);
+                        } else if (android.os.Build.VERSION.SDK_INT >= 19) {
+                            am.setExact(android.app.AlarmManager.RTC_WAKEUP, triggerTime, pi);
+                        } else {
+                            am.set(android.app.AlarmManager.RTC_WAKEUP, triggerTime, pi);
+                        }
+                    } else {
+                        startActivity(new Intent(AiChatActivity.this, targetActivity));
+                    }
+                } else {
+                    startService(new Intent(AiChatActivity.this, FloatingService.class));
+                }
+            }
+        }, 300);
     }
 
     private void updateToggleUI() {
@@ -470,165 +624,6 @@ public class AiChatActivity extends Activity {
         }).start();
     }
 
-    // 重构点：基于 OkHttp 的同步调用，解决长连接与超时问题
-    private String syncDeepSeekCall(String apiKey, String model, JSONArray messages) throws Exception {
-        JSONObject payload = new JSONObject();
-        payload.put("model", model);
-        payload.put("stream", false); 
-        
-        JSONObject format = new JSONObject();
-        format.put("type", "json_object");
-        payload.put("response_format", format); 
-        payload.put("messages", messages);
-        
-        RequestBody body = RequestBody.create(JSON_MEDIA, payload.toString());
-        Request request = new Request.Builder()
-                .url("https://api.deepseek.com/chat/completions")
-                .addHeader("Authorization", "Bearer " + apiKey)
-                .post(body)
-                .build();
-                
-        Response response = okHttpClient.newCall(request).execute();
-        if (response.isSuccessful() && response.body() != null) {
-            String resStr = response.body().string();
-            JSONObject res = new JSONObject(resStr);
-            return res.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
-        } else {
-            throw new Exception("OkHttp 拒绝连线: 状态码 " + response.code());
-        }
-    }
-
-    private String extractJsonFromText(String raw) {
-        if (raw == null) return "{}";
-        int start = raw.indexOf("{");
-        int end = raw.lastIndexOf("}");
-        if (start != -1 && end != -1 && end >= start) {
-            return raw.substring(start, end + 1);
-        }
-        return "{}";
-    }
-
-    private String executeAgentAction(String action, final String param) {
-        if ("READ_DEVICE".equals(action)) {
-            long availRam = 0, totalRam = 0;
-            try {
-                android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-                android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
-                if (am != null) { am.getMemoryInfo(mi); availRam = mi.availMem / 1048576L; totalRam = mi.totalMem / 1048576L;}
-            } catch (Exception e) {}
-            
-            int batteryPct = -1;
-            try {
-                Intent batteryIntent = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
-                if (batteryIntent != null) {
-                    int level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
-                    int scale = batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
-                    batteryPct = (int) (level * 100 / (float) scale);
-                }
-            } catch (Exception e) {}
-            
-            String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
-            return "设备时间: " + time + "\n剩余电量: " + batteryPct + "%\nRAM: 剩余 " + availRam + "MB / 总计 " + totalRam + "MB";
-            
-        } else if ("ENCRYPT_SAVE".equals(action)) {
-            try {
-                if (param == null || param.isEmpty()) return "操作失败：缺少需要加密的文本。";
-                File baseDir = new File(Environment.getExternalStorageDirectory(), "Download/.XiaoyuVault/Agent");
-                if (!baseDir.exists()) baseDir.mkdirs();
-                
-                String fileName = "Agent_Report_" + System.currentTimeMillis() + ".snt";
-                File outFile = new File(baseDir, fileName);
-                
-                String deviceId = android.provider.Settings.Secure.getString(getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
-                if (deviceId == null) deviceId = "xiaoyu_fallback_id";
-                
-                MessageDigest digest = MessageDigest.getInstance("SHA-256");
-                byte[] key = digest.digest((deviceId + "_xiaoyu_agent_master_key").getBytes("UTF-8"));
-                SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
-                Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-                byte[] iv = new byte[16];
-                new SecureRandom().nextBytes(iv);
-                cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(iv));
-
-                FileOutputStream fos = new FileOutputStream(outFile);
-                fos.write(iv);
-                CipherOutputStream cos = new CipherOutputStream(fos, cipher);
-                cos.write(param.getBytes("UTF-8"));
-                cos.flush();
-                cos.close();
-                
-                return "加密成功。文件已物理固化至目录: " + outFile.getAbsolutePath();
-            } catch (Exception e) {
-                return "操作失败，系统抛出异常: " + e.getMessage();
-            }
-            
-        } else if ("SCRAPE_WEB".equals(action)) {
-            // 重构点：彻底抛弃笨重的网络流，直接利用 Jsoup 执行工业级 DOM 提取
-            try {
-                if (param == null || param.isEmpty() || !param.startsWith("http")) return "操作失败：非法的 URL 参数。";
-                Document doc = Jsoup.connect(param)
-                        .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) XiaoyuAgent/8.0")
-                        .timeout(12000)
-                        .get();
-                // 自动剥离 HTML 标签，仅保留核心文本
-                String text = doc.text();
-                return "抓取成功。DOM 提纯预览:\n" + (text.length() > 3000 ? text.substring(0, 3000) + "..." : text);
-            } catch (Exception e) {
-                return "Jsoup 爬虫失败或受限: " + e.getMessage();
-            }
-            
-        } else if ("FILE_READ".equals(action)) {
-            try {
-                if (param == null || param.isEmpty()) return "操作失败：参数为空";
-                File f = new File(param);
-                if (!f.exists() || !f.isFile()) return "文件不存在或非文件实体";
-                BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
-                StringBuilder sb = new StringBuilder();
-                String line;
-                int lines = 0;
-                while((line = br.readLine()) != null && lines < 500) {
-                    sb.append(line).append("\n");
-                    lines++;
-                }
-                br.close();
-                String res = sb.toString();
-                return "文件读取成功:\n" + (res.length() > 3000 ? res.substring(0, 3000) + "..." : res);
-            } catch (Exception e) {
-                return "文件读取失败: " + e.getMessage();
-            }
-        } else if ("CLIPBOARD_MANAGE".equals(action)) {
-            mainHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-                    cb.setPrimaryClip(ClipData.newPlainText("AgentClipboard", param));
-                }
-            });
-            return "已静默写入系统剪贴板。";
-        } else if ("SHELL_EXEC".equals(action)) {
-            try {
-                Process p = Runtime.getRuntime().exec(param);
-                BufferedReader br = new BufferedReader(new InputStreamReader(p.getInputStream()));
-                StringBuilder sb = new StringBuilder();
-                String line;
-                int count = 0;
-                while ((line = br.readLine()) != null && count < 100) {
-                    sb.append(line).append("\n");
-                    count++;
-                }
-                br.close();
-                return "Shell执行结果:\n" + sb.toString();
-            } catch (Exception e) {
-                return "Shell执行拦截/失败: " + e.getMessage();
-            }
-        } else if ("TEXT_PROCESS".equals(action)) {
-            return "文本已接收处理。请进行下一步逻辑判断。";
-        }
-        
-        return "警告：未知的执行指令 (" + action + ")，请检查指令集规范。";
-    }
-
-    // 重构点：采用 OkHttp 的全双工引擎取代原生 HttpURLConnection
     private void callDeepSeekAPI(final String apiKey) {
         isAiTyping = true;
         tvStatus.setText("● 运算中...");
@@ -806,6 +801,146 @@ public class AiChatActivity extends Activity {
         }).start();
     }
 
+    private String syncDeepSeekCall(String apiKey, String model, JSONArray messages) throws Exception {
+        JSONObject payload = new JSONObject();
+        payload.put("model", model);
+        payload.put("stream", false); 
+        
+        JSONObject format = new JSONObject();
+        format.put("type", "json_object");
+        payload.put("response_format", format); 
+        payload.put("messages", messages);
+        
+        RequestBody body = RequestBody.create(JSON_MEDIA, payload.toString());
+        Request request = new Request.Builder()
+                .url("https://api.deepseek.com/chat/completions")
+                .addHeader("Authorization", "Bearer " + apiKey)
+                .post(body)
+                .build();
+                
+        Response response = okHttpClient.newCall(request).execute();
+        if (response.isSuccessful() && response.body() != null) {
+            String resStr = response.body().string();
+            JSONObject res = new JSONObject(resStr);
+            return res.getJSONArray("choices").getJSONObject(0).getJSONObject("message").getString("content");
+        } else {
+            throw new Exception("OkHttp 拒绝连线: 状态码 " + response.code());
+        }
+    }
+
+    private String extractJsonFromText(String raw) {
+        if (raw == null) return "{}";
+        int start = raw.indexOf("{");
+        int end = raw.lastIndexOf("}");
+        if (start != -1 && end != -1 && end >= start) {
+            return raw.substring(start, end + 1);
+        }
+        return "{}";
+    }
+
+    private String executeAgentAction(String action, final String param) {
+        if ("READ_DEVICE".equals(action)) {
+            long availRam = 0, totalRam = 0;
+            try {
+                android.app.ActivityManager am = (android.app.ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
+                android.app.ActivityManager.MemoryInfo mi = new android.app.ActivityManager.MemoryInfo();
+                if (am != null) { am.getMemoryInfo(mi); availRam = mi.availMem / 1048576L; totalRam = mi.totalMem / 1048576L;}
+            } catch (Exception e) {}
+            
+            int batteryPct = -1;
+            try {
+                Intent batteryIntent = registerReceiver(null, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
+                if (batteryIntent != null) {
+                    int level = batteryIntent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1);
+                    int scale = batteryIntent.getIntExtra(BatteryManager.EXTRA_SCALE, -1);
+                    batteryPct = (int) (level * 100 / (float) scale);
+                }
+            } catch (Exception e) {}
+            
+            String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
+            return "设备时间: " + time + "\n剩余电量: " + batteryPct + "%\nRAM: 剩余 " + availRam + "MB / 总计 " + totalRam + "MB";
+            
+        } else if ("ENCRYPT_SAVE".equals(action)) {
+            try {
+                if (param == null || param.isEmpty()) return "操作失败：缺少需要加密的文本。";
+                File baseDir = new File(Environment.getExternalStorageDirectory(), "Download/.XiaoyuVault/Agent");
+                if (!baseDir.exists()) baseDir.mkdirs();
+                
+                String fileName = "Agent_Report_" + System.currentTimeMillis() + ".snt";
+                File outFile = new File(baseDir, fileName);
+                
+                String deviceId = android.provider.Settings.Secure.getString(getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
+                if (deviceId == null) deviceId = "xiaoyu_fallback_id";
+                
+                MessageDigest digest = MessageDigest.getInstance("SHA-256");
+                byte[] key = digest.digest((deviceId + "_xiaoyu_agent_master_key").getBytes("UTF-8"));
+                SecretKeySpec keySpec = new SecretKeySpec(key, "AES");
+                Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+                byte[] iv = new byte[16];
+                new SecureRandom().nextBytes(iv);
+                cipher.init(Cipher.ENCRYPT_MODE, keySpec, new IvParameterSpec(iv));
+
+                FileOutputStream fos = new FileOutputStream(outFile);
+                fos.write(iv);
+                CipherOutputStream cos = new CipherOutputStream(fos, cipher);
+                cos.write(param.getBytes("UTF-8"));
+                cos.flush();
+                cos.close();
+                
+                return "加密成功。文件已物理固化至目录: " + outFile.getAbsolutePath();
+            } catch (Exception e) {
+                return "加密失败: " + e.getMessage();
+            }
+        } else if ("SCRAPE_WEB".equals(action)) {
+            try {
+                Document doc = Jsoup.connect(param).timeout(15000).get();
+                return "抓取成功。文本前500字:\n" + doc.text().substring(0, Math.min(doc.text().length(), 500));
+            } catch (Exception e) {
+                return "抓取失败: " + e.getMessage();
+            }
+        } else if ("FILE_READ".equals(action)) {
+            try {
+                File f = new File(param);
+                if (!f.exists()) return "读取失败: 文件不存在";
+                StringBuilder sb = new StringBuilder();
+                BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(f), "UTF-8"));
+                String line;
+                int count = 0;
+                while ((line = br.readLine()) != null && count < 100) { 
+                    sb.append(line).append("\n");
+                    count++;
+                }
+                br.close();
+                return "读取成功。前100行内容:\n" + sb.toString();
+            } catch (Exception e) {
+                return "读取失败: " + e.getMessage();
+            }
+        } else if ("CLIPBOARD_MANAGE".equals(action)) {
+            try {
+                ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                cb.setPrimaryClip(ClipData.newPlainText("AgentData", param));
+                return "已静默写入系统剪贴板。";
+            } catch (Exception e) {
+                return "写入剪贴板失败: " + e.getMessage();
+            }
+        } else if ("SHELL_EXEC".equals(action)) {
+            try {
+                Process process = Runtime.getRuntime().exec(param);
+                BufferedReader br = new BufferedReader(new InputStreamReader(process.getInputStream()));
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = br.readLine()) != null) sb.append(line).append("\n");
+                br.close();
+                return "Shell执行结果:\n" + sb.toString();
+            } catch (Exception e) {
+                return "Shell执行失败: " + e.getMessage();
+            }
+        } else if ("TEXT_PROCESS".equals(action)) {
+            return "本地文本处理就绪。由于您处于Agent引擎内，该操作实质为空轮转，请直接输出最终分析结果。";
+        }
+        return "未知错误：无效的 action 指令。";
+    }
+
     private void showApiKeyDialog() {
         final EditText input = new EditText(this);
         input.setHint("sk-...");
@@ -877,12 +1012,16 @@ public class AiChatActivity extends Activity {
     }
 
     private void initSession() {
-        refreshSessionList();
-        if (sessionList.isEmpty()) createNewSession();
-        else {
-            currentSessionId = Long.parseLong(sessionList.get(0)[0]);
+        sessionList.addAll(db.getAllSessions());
+        if (sessionList.isEmpty()) {
+            createNewSession();
+        } else {
+            String[] lastSession = sessionList.get(0);
+            currentSessionId = Long.parseLong(lastSession[0]);
+            currentSessionTitle = lastSession[1];
             loadChatHistoryForCurrentSession();
         }
+        sessionAdapter.notifyDataSetChanged();
     }
 
     private void createNewSession() {

@@ -124,17 +124,17 @@ public class MainActivity extends Activity {
                 }
             });
 
-            // 动态注入新功能入口 (避免修改 XML)
             try {
                 LinearLayout rootLayout = (LinearLayout) btnToAiChat.getParent();
+                float density = getResources().getDisplayMetrics().density;
+                
                 Button btnToLanRadar = new Button(this);
-                btnToLanRadar.setText("📡 局 域 网 声 呐 与 微 型 服 务 器");
+                btnToLanRadar.setText("📡 局 域 網 聲 吶 與 微 型 服 務 器");
                 btnToLanRadar.setBackgroundResource(R.drawable.selector_neumorph_btn);
                 btnToLanRadar.setTextColor(android.graphics.Color.parseColor("#E67E22"));
                 btnToLanRadar.setTextSize(13f);
                 btnToLanRadar.setTypeface(null, android.graphics.Typeface.BOLD);
                 
-                float density = getResources().getDisplayMetrics().density;
                 LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT, Math.round(55 * density));
                 lp.topMargin = Math.round(15 * density);
@@ -145,6 +145,26 @@ public class MainActivity extends Activity {
                         startActivity(new Intent(MainActivity.this, LanRadarActivity.class));
                     }
                 });
+
+                // 新增注入：物理設備遙測終端
+                Button btnToLogTerminal = new Button(this);
+                btnToLogTerminal.setText("📟 物 理 設 備 遙 測 終 端");
+                btnToLogTerminal.setBackgroundResource(R.drawable.selector_neumorph_btn);
+                btnToLogTerminal.setTextColor(android.graphics.Color.parseColor("#8E44AD"));
+                btnToLogTerminal.setTextSize(13f);
+                btnToLogTerminal.setTypeface(null, android.graphics.Typeface.BOLD);
+                
+                LinearLayout.LayoutParams lpLog = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, Math.round(55 * density));
+                lpLog.topMargin = Math.round(15 * density);
+                rootLayout.addView(btnToLogTerminal, rootLayout.indexOfChild(btnToLanRadar) + 1, lpLog);
+                
+                btnToLogTerminal.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        startActivity(new Intent(MainActivity.this, LogTerminalActivity.class));
+                    }
+                });
+
             } catch (Exception e) {}
         }
 
