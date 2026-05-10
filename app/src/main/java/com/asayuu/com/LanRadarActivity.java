@@ -1,6 +1,8 @@
 package com.asayuu.com;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.graphics.Color;
 import android.net.wifi.WifiInfo;
@@ -26,15 +28,16 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import javax.crypto.Cipher;
 import javax.crypto.CipherOutputStream;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-// 【核心修复】：更正了物理引用的包名，并显式导入引擎的内部核心类
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoHTTPD.IHTTPSession;
 import fi.iki.elonen.NanoHTTPD.Method;
@@ -139,7 +142,7 @@ public class LanRadarActivity extends Activity {
             return;
         }
         isScanning = true;
-        appendLog("🚀 启动 ICMP 声呐阵列，网段: " + ip.substring(0, ip.lastIndexOf('.')) + ".x");
+        appendLog("🚀 启动 ICMP 原生声呐阵列，网段: " + ip.substring(0, ip.lastIndexOf('.')) + ".x");
 
         final String prefix = ip.substring(0, ip.lastIndexOf('.') + 1);
         for (int i = 1; i <= 254; i++) {
@@ -148,12 +151,16 @@ public class LanRadarActivity extends Activity {
                 @Override
                 public void run() {
                     try {
-                        InetAddress target = InetAddress.getByName(prefix + suffix);
-                        if (target.isReachable(800)) { 
+                        final String targetIp = prefix + suffix;
+                        Process process = Runtime.getRuntime().exec("ping -c 1 -w 1 " + targetIp);
+                        int status = process.waitFor();
+                        
+                        if (status == 0) {
+                            InetAddress target = InetAddress.getByName(targetIp);
                             final String hostName = target.getCanonicalHostName();
                             mainHandler.post(new Runnable() {
                                 @Override public void run() {
-                                    appendLog("🎯 发现存活设备: " + prefix + suffix + " [" + hostName + "]");
+                                    appendLog("🎯 发现物理存活设备: " + targetIp + " [" + hostName + "]");
                                 }
                             });
                         }
@@ -229,7 +236,7 @@ public class LanRadarActivity extends Activity {
         fis.close();
     }
 
-    // --- NanoHTTPD 微型引擎 ---
+    // --- NanoHTTPD 微型引擎 (集成序列 Beta 剪贴板中继) ---
     private class XiaoyuServer extends NanoHTTPD {
         public XiaoyuServer(int port) {
             super(port);
@@ -238,53 +245,105 @@ public class LanRadarActivity extends Activity {
         @Override
         public Response serve(IHTTPSession session) {
             Method method = session.getMethod();
+            String uri = session.getUri();
+            
             if (Method.POST.equals(method)) {
                 try {
                     Map<String, String> files = new HashMap<String, String>();
                     session.parseBody(files);
-                    String tempFilePath = files.get("uploadFile");
                     
-                    if (tempFilePath != null) {
-                        File tempFile = new File(tempFilePath);
-                        if (tempFile.exists()) {
-                            File dropDir = new File(Environment.getExternalStorageDirectory(), "Download/.XiaoyuVault/WebDrop");
-                            if (!dropDir.exists()) dropDir.mkdirs();
-                            
-                            String originalName = session.getParms().get("uploadFile");
-                            if (originalName == null || originalName.trim().isEmpty()) {
-                                originalName = "WebDrop_Push_" + System.currentTimeMillis();
+                    // 路由分发：物理文件推送
+                    if (uri.equals("/upload")) {
+                        String tempFilePath = files.get("uploadFile");
+                        if (tempFilePath != null) {
+                            File tempFile = new File(tempFilePath);
+                            if (tempFile.exists()) {
+                                File dropDir = new File(Environment.getExternalStorageDirectory(), "Download/.XiaoyuVault/WebDrop");
+                                if (!dropDir.exists()) dropDir.mkdirs();
+                                
+                                String originalName = session.getParms().get("uploadFile");
+                                if (originalName == null || originalName.trim().isEmpty()) {
+                                    originalName = "WebDrop_Push_" + System.currentTimeMillis();
+                                }
+                                
+                                File outFile = new File(dropDir, originalName + ".snt");
+                                encryptFileBlindly(tempFile, outFile);
+                                
+                                mainHandler.post(new Runnable() {
+                                    @Override public void run() {
+                                        appendLog("📥 盲收敛: 收到远端文件，已加密落盘至暗盒 WebDrop 目录。");
+                                    }
+                                });
+                                
+                                StringBuilder res = new StringBuilder("<html><head><meta charset='utf-8'><title>上传成功</title></head>");
+                                res.append("<body style='font-family:sans-serif; padding:20px; background:#f4f4f4;'>");
+                                res.append("<h2 style='color:#27AE60;'>✅ 物理穿透推送成功</h2>");
+                                res.append("<p>文件已被局域网探针拦截并加密收敛至宿主机暗盒。</p>");
+                                res.append("<a href='/'>[ 返回控制台 ]</a>");
+                                res.append("</body></html>");
+                                return newFixedLengthResponse(Response.Status.OK, "text/html", res.toString());
                             }
-                            
-                            File outFile = new File(dropDir, originalName + ".snt");
-                            encryptFileBlindly(tempFile, outFile);
-                            
+                        }
+                    } 
+                    // 路由分发：剪贴板注入中继
+                    else if (uri.equals("/clipboard")) {
+                        final String newClip = session.getParms().get("clip_text");
+                        if (newClip != null && !newClip.isEmpty()) {
                             mainHandler.post(new Runnable() {
                                 @Override public void run() {
-                                    appendLog("📥 盲收敛: 收到远端文件，已加密落盘至暗盒 WebDrop 目录。");
+                                    ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                                    cb.setPrimaryClip(ClipData.newPlainText("LanRelay", newClip));
+                                    Toast.makeText(LanRadarActivity.this, "📋 剪贴板已物理覆盖", Toast.LENGTH_SHORT).show();
+                                    appendLog("📝 跨端中继: 收到 PC 剪贴板注入请求。");
                                 }
                             });
-                            
-                            StringBuilder res = new StringBuilder("<html><head><meta charset='utf-8'><title>上传成功</title></head>");
-                            res.append("<body style='font-family:sans-serif; padding:20px; background:#f4f4f4;'>");
-                            res.append("<h2 style='color:#27AE60;'>✅ 物理穿透推送成功</h2>");
-                            res.append("<p>文件已被局域网探针拦截并加密收敛至宿主机暗盒。</p>");
-                            res.append("<a href='/'>[ 返回控制台 ]</a>");
-                            res.append("</body></html>");
-                            return newFixedLengthResponse(Response.Status.OK, "text/html", res.toString());
                         }
+                        // 注入完毕后重定向回首页，防止页面卡死
+                        Response r = newFixedLengthResponse(Response.Status.REDIRECT, "text/plain", "");
+                        r.addHeader("Location", "/");
+                        return r;
                     }
                 } catch (Exception e) {
-                    return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "上传失败或物理拦截异常: " + e.getMessage());
+                    return newFixedLengthResponse(Response.Status.INTERNAL_ERROR, "text/plain", "引擎底层异常: " + e.getMessage());
                 }
             }
 
             File exportDir = new File(Environment.getExternalStorageDirectory(), "Download/XiaoyuExport");
             if (!exportDir.exists()) exportDir.mkdirs();
 
-            String uri = session.getUri();
             if (uri.equals("/")) {
+                // 物理阻塞抓取当前手机剪贴板内容 (主线程同步通信)
+                final String[] currentClip = {""};
+                final CountDownLatch latch = new CountDownLatch(1);
+                mainHandler.post(new Runnable() {
+                    @Override public void run() {
+                        try {
+                            ClipboardManager cb = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
+                            if (cb.hasPrimaryClip() && cb.getPrimaryClip().getItemCount() > 0) {
+                                CharSequence t = cb.getPrimaryClip().getItemAt(0).getText();
+                                if (t != null) currentClip[0] = t.toString();
+                            }
+                        } catch (Exception e) {}
+                        latch.countDown();
+                    }
+                });
+                try { latch.await(2, TimeUnit.SECONDS); } catch (Exception e) {}
+
                 StringBuilder html = new StringBuilder("<html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>小欲数据中枢</title></head>");
                 html.append("<body style='font-family:sans-serif; padding:20px; background:#f4f4f4;'>");
+                
+                // 区块一：跨端文本中继站
+                html.append("<h2 style='color:#8E44AD;'>📋 跨端剪贴板中继站</h2><hr>");
+                html.append("<p style='font-size:12px; color:#555;'>宿主机当前剪贴板内容 (仅文本):</p>");
+                html.append("<textarea readonly style='width:100%; height:80px; padding:10px; border-radius:5px; border:1px solid #ccc; background:#e9e9e9;'>")
+                    .append(currentClip[0].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
+                    .append("</textarea><br><br>");
+                html.append("<form method='POST' action='/clipboard'>");
+                html.append("<textarea name='clip_text' placeholder='在此输入文本，强行覆盖手机剪贴板...' style='width:100%; height:80px; padding:10px; border-radius:5px; border:1px solid #ccc;'></textarea><br>");
+                html.append("<input type='submit' value=' 执 行 跨 端 注 入 ' style='margin-top:10px; padding:10px 20px; background:#8E44AD; color:white; border:none; border-radius:5px; font-weight:bold; cursor:pointer;'>");
+                html.append("</form><br><br>");
+
+                // 区块二：物理导出舱
                 html.append("<h2 style='color:#333;'>📁 物理导出舱 (XiaoyuExport)</h2><hr>");
                 File[] filesArr = exportDir.listFiles();
                 if (filesArr != null && filesArr.length > 0) {
@@ -299,10 +358,11 @@ public class LanRadarActivity extends Activity {
                     html.append("<p style='color:#888;'>当前没有任何已解密导出的文件。</p>");
                 }
 
+                // 区块三：盲收敛推送
                 html.append("<br><br><h2 style='color:#333;'>📤 全双工盲收敛推送 (自动加密落入暗盒)</h2><hr>");
-                html.append("<form method='POST' enctype='multipart/form-data' action='/'>");
+                html.append("<form method='POST' enctype='multipart/form-data' action='/upload'>");
                 html.append("<input type='file' name='uploadFile' style='margin-bottom:15px;'><br>");
-                html.append("<input type='submit' value=' 执 行 物 理 推 送 ' style='padding:10px 20px; background:#4A90E2; color:white; border:none; border-radius:5px; font-weight:bold;'>");
+                html.append("<input type='submit' value=' 执 行 物 理 推 送 ' style='padding:10px 20px; background:#4A90E2; color:white; border:none; border-radius:5px; font-weight:bold; cursor:pointer;'>");
                 html.append("</form>");
 
                 html.append("</body></html>");

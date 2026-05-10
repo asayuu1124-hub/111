@@ -4,11 +4,15 @@ import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Base64;
+import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -26,6 +30,9 @@ public class CryptoToolActivity extends Activity implements View.OnClickListener
 
     private EditText etInput, etKey;
     private TextView tvResult;
+
+    // 物理注入的隐写控制矩阵
+    private Button btnZwEnc, btnZwDec;
 
     // --- 摩斯密码字典矩阵 ---
     private static final String[] MORSE_CHARS = {
@@ -77,6 +84,53 @@ public class CryptoToolActivity extends Activity implements View.OnClickListener
                 }
             }
         });
+
+        injectZeroWidthMatrix();
+    }
+
+    // --- 动态视图物理注入 (修复层叠溢出版) ---
+    private void injectZeroWidthMatrix() {
+        try {
+            // 抓取相对布局容器
+            ViewGroup relativeLayout = (ViewGroup) tvResult.getParent();
+            // 向上追溯主线性容器，避免覆盖
+            ViewGroup mainLinearLayout = (ViewGroup) relativeLayout.getParent();
+            float density = getResources().getDisplayMetrics().density;
+            
+            LinearLayout llZero = new LinearLayout(this);
+            llZero.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            lp.topMargin = (int)(10 * density);
+            llZero.setLayoutParams(lp);
+
+            btnZwEnc = new Button(this);
+            btnZwEnc.setText("零宽隐写注入 (密文放密钥框)");
+            btnZwEnc.setBackgroundResource(R.drawable.selector_neumorph_btn);
+            btnZwEnc.setTextColor(Color.parseColor("#8E44AD"));
+            btnZwEnc.setTextSize(11f);
+            LinearLayout.LayoutParams btnLp1 = new LinearLayout.LayoutParams(0, (int)(45 * density), 1.0f);
+            btnLp1.rightMargin = (int)(5 * density);
+            btnZwEnc.setLayoutParams(btnLp1);
+            btnZwEnc.setOnClickListener(this);
+
+            btnZwDec = new Button(this);
+            btnZwDec.setText("零宽隐写提取 (解析)");
+            btnZwDec.setBackgroundResource(R.drawable.selector_neumorph_btn);
+            btnZwDec.setTextColor(Color.parseColor("#8E44AD"));
+            btnZwDec.setTextSize(11f);
+            LinearLayout.LayoutParams btnLp2 = new LinearLayout.LayoutParams(0, (int)(45 * density), 1.0f);
+            btnLp2.leftMargin = (int)(5 * density);
+            btnZwDec.setLayoutParams(btnLp2);
+            btnZwDec.setOnClickListener(this);
+
+            llZero.addView(btnZwEnc);
+            llZero.addView(btnZwDec);
+
+            // 物理排版：将其注入到相对布局的正上方
+            int insertIndex = mainLinearLayout.indexOfChild(relativeLayout);
+            mainLinearLayout.addView(llZero, insertIndex > 0 ? insertIndex : mainLinearLayout.getChildCount() - 1);
+        } catch (Exception e) {}
     }
 
     @Override
@@ -84,8 +138,9 @@ public class CryptoToolActivity extends Activity implements View.OnClickListener
         String input = etInput.getText().toString().trim();
         String key = etKey.getText().toString().trim();
 
-        if (input.isEmpty()) {
-            Toast.makeText(this, "请先输入文本", Toast.LENGTH_SHORT).show();
+        // 仅在非隐写注入时强制校验公开载体输入
+        if (input.isEmpty() && v != btnZwEnc) {
+            Toast.makeText(this, "请先在【输入】框提供公开文本载体", Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -93,7 +148,12 @@ public class CryptoToolActivity extends Activity implements View.OnClickListener
         int id = v.getId();
         
         try {
-            if (id == R.id.btn_md5) result = getHash(input, "MD5");
+            if (v == btnZwEnc) {
+                if (key.isEmpty()) throw new Exception("拒绝操作：必须在【密钥】框提供需要隐藏的机密流");
+                result = encodeZeroWidth(input, key);
+            } else if (v == btnZwDec) {
+                result = decodeZeroWidth(input);
+            } else if (id == R.id.btn_md5) result = getHash(input, "MD5");
             else if (id == R.id.btn_sha256) result = getHash(input, "SHA-256");
             else if (id == R.id.btn_b64_enc) result = Base64.encodeToString(input.getBytes("UTF-8"), Base64.NO_WRAP);
             else if (id == R.id.btn_b64_dec) result = new String(Base64.decode(input, Base64.NO_WRAP), "UTF-8");
@@ -108,11 +168,61 @@ public class CryptoToolActivity extends Activity implements View.OnClickListener
             
             tvResult.setText(result);
         } catch (Exception e) {
-            tvResult.setText("❌ 处理失败: \n" + e.getMessage());
+            tvResult.setText("❌ 装甲异常: \n" + e.getMessage());
         }
     }
 
-    // --- 核心算法库 ---
+    // --- 零宽字符隐写引擎底层算法 ---
+
+    private String encodeZeroWidth(String carrier, String secret) throws Exception {
+        if (carrier.isEmpty()) carrier = "未命名安全载体"; 
+
+        byte[] bytes = secret.getBytes("UTF-8");
+        StringBuilder hidden = new StringBuilder();
+        hidden.append('\u200B'); // 零宽空格，界定数据块起点
+        
+        for (byte b : bytes) {
+            for (int i = 7; i >= 0; i--) {
+                int bit = (b >> i) & 1;
+                // 强制二进制降维：1映射为零宽不连字，0映射为零宽连字
+                hidden.append(bit == 1 ? '\u200C' : '\u200D'); 
+            }
+        }
+        hidden.append('\u200B'); // 零宽空格，界定数据块终点
+
+        // 物理缝隙注入：强制切开公共载体，将隐写流植入首字符间隙
+        return carrier.substring(0, 1) + hidden.toString() + carrier.substring(1);
+    }
+
+    private String decodeZeroWidth(String mixed) throws Exception {
+        StringBuilder binary = new StringBuilder();
+        boolean isRecording = false;
+        
+        for (int i = 0; i < mixed.length(); i++) {
+            char c = mixed.charAt(i);
+            if (c == '\u200B') {
+                isRecording = !isRecording; // 触碰界定符，切换拦截状态
+                continue;
+            }
+            if (isRecording) {
+                if (c == '\u200C') binary.append('1');
+                else if (c == '\u200D') binary.append('0');
+            }
+        }
+
+        if (binary.length() == 0 || binary.length() % 8 != 0) {
+            throw new Exception("该文本未携带零宽装甲，或数据流已遭受结构性损毁。");
+        }
+
+        byte[] bytes = new byte[binary.length() / 8];
+        for (int i = 0; i < bytes.length; i++) {
+            String byteStr = binary.substring(i * 8, (i + 1) * 8);
+            bytes[i] = (byte) Integer.parseInt(byteStr, 2);
+        }
+        return new String(bytes, "UTF-8");
+    }
+
+    // --- 历史密码学算法库 ---
 
     private String encodeMorse(String input) {
         input = input.toUpperCase();

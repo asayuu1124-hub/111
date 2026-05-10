@@ -17,6 +17,8 @@ import java.net.*;
 import javax.net.ssl.*;
 import java.security.cert.X509Certificate;
 import java.util.List;
+import java.util.ArrayList;
+import okhttp3.*;
 
 public class FloatingService extends Service {
     private WindowManager windowManager;
@@ -29,9 +31,18 @@ public class FloatingService extends Service {
     private EditText etInput;
     private TextView tvResult, tvToggle, tvShieldToggle, tvCounterMode;
     private TextView tvCpu, tvRam, tvRom, tvBattery, tvNetRx, tvNetTx;
-    private TextView tvTargetNet; // 动态注入：独立网速嗅探器
+    private TextView tvTargetNet; 
     private ImageView ivCopy;
     private SeekBar sbAlpha, sbShieldAlpha, sbShieldWindowAlpha, sbMonitorWindowAlpha, sbCounterWindowAlpha;
+    
+    // --- 序列 Delta：暗视场 RGBA 物理寄存器 ---
+    private int redVal = 0, greenVal = 0, blueVal = 0;
+    private SeekBar sbRed, sbGreen, sbBlue;
+    // ------------------------------------
+
+    private Spinner spinSrcLang, spinTgtLang;
+    private final String[] langNames = {"自动检测", "中文", "英语", "日语", "韩语", "法语", "德语", "俄语"};
+    private final String[] langCodes = {"auto", "ZH", "EN", "JA", "KO", "FR", "DE", "RU"};
 
     private boolean isPassiveMode = true;
     private boolean isShieldOn = false;
@@ -50,16 +61,19 @@ public class FloatingService extends Service {
     private int targetUid = -1;
     private String targetAppName = "全局";
 
-    // --- 主动告警状态机 ---
     private boolean isTempWarned = false;
     private boolean isLowBatteryWarned = false;
     private boolean isFullBatteryWarned = false;
 
-    // --- Counter Matrix Data ---
     private final String[] CARD_NAMES = {"大王", "小王", "2", "A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3"};
     private final int[] MAX_COUNTS = {1, 1, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4};
     private int[] currentCounts = new int[15];
     private TextView[] cardViews = new TextView[15];
+
+    private OkHttpClient client;
+    private volatile boolean hasResult = false;
+    private volatile int failedCount = 0;
+    private final List<Call> activeCalls = new ArrayList<Call>();
 
     private BroadcastReceiver batteryReceiver = new BroadcastReceiver() {
         @Override
@@ -119,7 +133,7 @@ public class FloatingService extends Service {
         super.onCreate();
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
         db = new DBHelper(this);
-        trustAllSSL();
+        initOkHttp();
         registerReceiver(batteryReceiver, new IntentFilter(Intent.ACTION_BATTERY_CHANGED));
         initParams();
         initShield();
@@ -129,20 +143,28 @@ public class FloatingService extends Service {
         initClipboardListener();
     }
 
-    private void trustAllSSL() {
+    private void initOkHttp() {
         try {
-             TrustManager[] tm = new TrustManager[]{new X509TrustManager() {
-                public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
-                public void checkClientTrusted(X509Certificate[] c, String a) {}
-                public void checkServerTrusted(X509Certificate[] c, String a) {}
+            final TrustManager[] trustAllCerts = new TrustManager[]{new X509TrustManager() {
+                @Override public void checkClientTrusted(X509Certificate[] chain, String authType) {}
+                @Override public void checkServerTrusted(X509Certificate[] chain, String authType) {}
+                @Override public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[]{}; }
             }};
-            SSLContext sc = SSLContext.getInstance("TLS");
-            sc.init(null, tm, new java.security.SecureRandom());
-            HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
-            HttpsURLConnection.setDefaultHostnameVerifier(new HostnameVerifier() {
-                public boolean verify(String h, SSLSession s) { return true; }
-            });
-        } catch (Exception e) {}
+            final SSLContext sslContext = SSLContext.getInstance("SSL");
+            sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+            final SSLSocketFactory sslSocketFactory = sslContext.getSocketFactory();
+
+            client = new OkHttpClient.Builder()
+                .sslSocketFactory(sslSocketFactory, (X509TrustManager)trustAllCerts[0])
+                .hostnameVerifier(new HostnameVerifier() {
+                    @Override public boolean verify(String hostname, SSLSession session) { return true; }
+                })
+                .connectTimeout(5, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(8, java.util.concurrent.TimeUnit.SECONDS)
+                .build();
+        } catch (Exception e) {
+            client = new OkHttpClient();
+        }
     }
 
     private void initParams() {
@@ -155,10 +177,20 @@ public class FloatingService extends Service {
         params.softInputMode = WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN;
     }
 
+    // --- 序列 Delta：物理防砖头渲染器流合并 ---
+    private void applyShieldColor() {
+        if (shieldView != null) {
+            // 防砖头锁死：最高透明度遮蔽率限制在 230（约90%），永远保留10%可见度防止手机变砖
+            int finalAlpha = Math.min(shieldAlpha, 230);
+            // 将 RGBA 色彩物理降维并强行覆写入渲染层
+            int color = (finalAlpha << 24) | (redVal << 16) | (greenVal << 8) | blueVal;
+            shieldView.setBackgroundColor(color);
+        }
+    }
+
     private void initShield() {
         shieldView = new FrameLayout(this);
-        shieldView.setBackgroundColor(0xFF000000); 
-        shieldView.getBackground().mutate().setAlpha(shieldAlpha);
+        applyShieldColor(); // 接入物理渲染引擎
 
         int type = (Build.VERSION.SDK_INT >= 26) ? 2038 : 2002;
         shieldParams = new WindowManager.LayoutParams(
@@ -183,6 +215,23 @@ public class FloatingService extends Service {
         llMonitorCard = (LinearLayout) windowView.findViewById(R.id.ll_monitor_card);
         llCounterCard = (LinearLayout) windowView.findViewById(R.id.ll_counter_card);
         
+        // --- 序列 Delta：无损动态注入暗视场面板 ---
+        if (llShieldCard != null) {
+            injectRgbControls();
+        }
+        
+        spinSrcLang = (Spinner) windowView.findViewById(R.id.spin_src_lang);
+        spinTgtLang = (Spinner) windowView.findViewById(R.id.spin_tgt_lang);
+        
+        ArrayAdapter<String> langAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_spinner_item, langNames);
+        langAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        if (spinSrcLang != null && spinTgtLang != null) {
+            spinSrcLang.setAdapter(langAdapter);
+            spinTgtLang.setAdapter(langAdapter);
+            spinSrcLang.setSelection(0); 
+            spinTgtLang.setSelection(1); 
+        }
+
         etInput = (EditText) windowView.findViewById(R.id.et_trans_input);
         tvResult = (TextView) windowView.findViewById(R.id.tv_trans_result);
         tvToggle = (TextView) windowView.findViewById(R.id.tv_mode_toggle);
@@ -202,7 +251,6 @@ public class FloatingService extends Service {
         sbMonitorWindowAlpha = (SeekBar) windowView.findViewById(R.id.sb_monitor_window_alpha);
         sbCounterWindowAlpha = (SeekBar) windowView.findViewById(R.id.sb_counter_window_alpha);
 
-        // --- 动态注入：独立包名网速嗅探控件 ---
         try {
             tvTargetNet = new TextView(this);
             tvTargetNet.setText("🎯 测速目标: 全局 (点击锁定当前前台App)");
@@ -250,12 +298,11 @@ public class FloatingService extends Service {
             }
         });
 
+        // 绑定物理渲染通道
         sbShieldAlpha.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar s, int p, boolean b) {
                 shieldAlpha = p;
-                if (shieldView != null && shieldView.getBackground() != null) {
-                    shieldView.getBackground().mutate().setAlpha(shieldAlpha);
-                }
+                applyShieldColor();
             }
             @Override public void onStartTrackingTouch(SeekBar s) {}
             @Override public void onStopTrackingTouch(SeekBar s) {}
@@ -266,9 +313,9 @@ public class FloatingService extends Service {
                 updateWindowAlpha(p);
                 if (b) { 
                     if (s.getId() != R.id.sb_trans_alpha) sbAlpha.setProgress(p);
-                    if (s.getId() != R.id.sb_shield_window_alpha) sbShieldWindowAlpha.setProgress(p);
-                    if (s.getId() != R.id.sb_monitor_window_alpha) sbMonitorWindowAlpha.setProgress(p);
-                    if (s.getId() != R.id.sb_counter_window_alpha) sbCounterWindowAlpha.setProgress(p);
+                    if (s.getId() != R.id.sb_shield_window_alpha && sbShieldWindowAlpha != null) sbShieldWindowAlpha.setProgress(p);
+                    if (s.getId() != R.id.sb_monitor_window_alpha && sbMonitorWindowAlpha != null) sbMonitorWindowAlpha.setProgress(p);
+                    if (s.getId() != R.id.sb_counter_window_alpha && sbCounterWindowAlpha != null) sbCounterWindowAlpha.setProgress(p);
                 }
             }
             @Override public void onStartTrackingTouch(SeekBar s) {}
@@ -276,9 +323,9 @@ public class FloatingService extends Service {
         };
         
         sbAlpha.setOnSeekBarChangeListener(windowAlphaListener);
-        sbShieldWindowAlpha.setOnSeekBarChangeListener(windowAlphaListener);
-        sbMonitorWindowAlpha.setOnSeekBarChangeListener(windowAlphaListener);
-        sbCounterWindowAlpha.setOnSeekBarChangeListener(windowAlphaListener);
+        if (sbShieldWindowAlpha != null) sbShieldWindowAlpha.setOnSeekBarChangeListener(windowAlphaListener);
+        if (sbMonitorWindowAlpha != null) sbMonitorWindowAlpha.setOnSeekBarChangeListener(windowAlphaListener);
+        if (sbCounterWindowAlpha != null) sbCounterWindowAlpha.setOnSeekBarChangeListener(windowAlphaListener);
 
         etInput.setOnEditorActionListener(new TextView.OnEditorActionListener() {
             @Override public boolean onEditorAction(TextView v, int actionId, KeyEvent event) {
@@ -299,6 +346,7 @@ public class FloatingService extends Service {
                 Toast.makeText(FloatingService.this, "已复制", Toast.LENGTH_SHORT).show();
             }
         });
+        
         View.OnTouchListener focusTouchListener = new View.OnTouchListener() {
             @Override public boolean onTouch(View v, MotionEvent e) {
                 if (e.getAction() == MotionEvent.ACTION_DOWN) {
@@ -370,23 +418,115 @@ public class FloatingService extends Service {
         windowView.findViewById(R.id.btn_drag).setOnTouchListener(new TouchListener(false));
     }
 
-    private void lockForegroundAppNet() {
+    // --- 序列 Delta：动态注入物理 RGB 控制器与状态机 ---
+    private void injectRgbControls() {
         try {
-            ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-            if (Build.VERSION.SDK_INT >= 21) {
-                List<ActivityManager.RunningAppProcessInfo> pids = am.getRunningAppProcesses();
-                if (pids != null && !pids.isEmpty()) {
-                    for (ActivityManager.RunningAppProcessInfo processInfo : pids) {
-                        if (processInfo.importance == ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND) {
-                            PackageManager pm = getPackageManager();
-                            ApplicationInfo ai = pm.getApplicationInfo(processInfo.processName, 0);
-                            targetUid = ai.uid;
-                            targetAppName = pm.getApplicationLabel(ai).toString();
-                            break;
-                        }
+            TextView tvRed = new TextView(this); tvRed.setText("🔴 红色增益 (过滤蓝绿光)"); tvRed.setTextColor(0xFFE74C3C); tvRed.setTextSize(11f);
+            sbRed = new SeekBar(this); sbRed.setMax(255);
+            llShieldCard.addView(tvRed); llShieldCard.addView(sbRed);
+            
+            TextView tvGreen = new TextView(this); tvGreen.setText("🟢 绿色增益"); tvGreen.setTextColor(0xFF2ECC71); tvGreen.setTextSize(11f);
+            sbGreen = new SeekBar(this); sbGreen.setMax(255);
+            llShieldCard.addView(tvGreen); llShieldCard.addView(sbGreen);
+            
+            TextView tvBlue = new TextView(this); tvBlue.setText("🔵 蓝色增益"); tvBlue.setTextColor(0xFF3498DB); tvBlue.setTextSize(11f);
+            sbBlue = new SeekBar(this); sbBlue.setMax(255);
+            llShieldCard.addView(tvBlue); llShieldCard.addView(sbBlue);
+            
+            SeekBar.OnSeekBarChangeListener rgbListener = new SeekBar.OnSeekBarChangeListener() {
+                @Override public void onProgressChanged(SeekBar s, int p, boolean b) {
+                    if (s == sbRed) redVal = p;
+                    else if (s == sbGreen) greenVal = p;
+                    else if (s == sbBlue) blueVal = p;
+                    applyShieldColor();
+                }
+                @Override public void onStartTrackingTouch(SeekBar s) {}
+                @Override public void onStopTrackingTouch(SeekBar s) {}
+            };
+            sbRed.setOnSeekBarChangeListener(rgbListener);
+            sbGreen.setOnSeekBarChangeListener(rgbListener);
+            sbBlue.setOnSeekBarChangeListener(rgbListener);
+            
+            LinearLayout row1 = new LinearLayout(this); row1.setOrientation(LinearLayout.HORIZONTAL);
+            row1.addView(createPresetBtn("🔴 战术红场", 180, 255, 0, 0, 0xFFE74C3C));
+            row1.addView(createPresetBtn("🌑 绝对深渊", 210, 0, 0, 0, 0xFF95A5A6));
+            
+            LinearLayout row2 = new LinearLayout(this); row2.setOrientation(LinearLayout.HORIZONTAL);
+            row2.addView(createPresetBtn("🟡 护眼暖场", 100, 255, 180, 0, 0xFFF1C40F));
+            row2.addView(createPresetBtn("❌ 撤除色彩", 0, 0, 0, 0, 0xFFE74C3C));
+            
+            llShieldCard.addView(row1);
+            llShieldCard.addView(row2);
+        } catch (Exception e) {}
+    }
+
+    private Button createPresetBtn(String txt, final int a, final int r, final int g, final int b, int col) {
+        Button btn = new Button(this);
+        btn.setText(txt); btn.setTextColor(col); btn.setTextSize(10f);
+        btn.setBackgroundColor(0x00000000); // 透明底
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1.0f);
+        btn.setLayoutParams(lp);
+        btn.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (sbShieldAlpha != null) sbShieldAlpha.setProgress(a);
+                if (sbRed != null) sbRed.setProgress(r);
+                if (sbGreen != null) sbGreen.setProgress(g);
+                if (sbBlue != null) sbBlue.setProgress(b);
+            }
+        });
+        return btn;
+    }
+
+    private boolean hasUsageStatsPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            android.app.AppOpsManager appOps = (android.app.AppOpsManager) getSystemService(Context.APP_OPS_SERVICE);
+            int mode = appOps.checkOpNoThrow(android.app.AppOpsManager.OPSTR_GET_USAGE_STATS, android.os.Process.myUid(), getPackageName());
+            return mode == android.app.AppOpsManager.MODE_ALLOWED;
+        }
+        return true;
+    }
+
+    private void lockForegroundAppNet() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            if (!hasUsageStatsPermission()) {
+                Toast.makeText(this, "需授权[使用情况访问]以突破系统致盲", Toast.LENGTH_LONG).show();
+                Intent intent = new Intent(android.provider.Settings.ACTION_USAGE_ACCESS_SETTINGS);
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                startActivity(intent);
+                return;
+            }
+
+            try {
+                android.app.usage.UsageStatsManager usm = (android.app.usage.UsageStatsManager) getSystemService(Context.USAGE_STATS_SERVICE);
+                long time = System.currentTimeMillis();
+                
+                android.app.usage.UsageEvents events = usm.queryEvents(time - 1000 * 60, time);
+                android.app.usage.UsageEvents.Event event = new android.app.usage.UsageEvents.Event();
+                String currentApp = null;
+                
+                while (events.hasNextEvent()) {
+                    events.getNextEvent(event);
+                    if (event.getEventType() == android.app.usage.UsageEvents.Event.MOVE_TO_FOREGROUND) {
+                        currentApp = event.getPackageName();
                     }
                 }
-            } else {
+                
+                if (currentApp != null) {
+                    PackageManager pm = getPackageManager();
+                    ApplicationInfo ai = pm.getApplicationInfo(currentApp, 0);
+                    targetUid = ai.uid;
+                    targetAppName = pm.getApplicationLabel(ai).toString();
+                    
+                    tvTargetNet.setText("🎯 锁定: " + targetAppName + " [解除]");
+                    tvTargetNet.setTextColor(0xFFE67E22);
+                    lastRx = TrafficStats.getUidRxBytes(targetUid);
+                    lastTx = TrafficStats.getUidTxBytes(targetUid);
+                    return;
+                }
+            } catch (Exception e) {}
+        } else {
+            try {
+                ActivityManager am = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
                 List<ActivityManager.RunningTaskInfo> tasks = am.getRunningTasks(1);
                 if (tasks != null && !tasks.isEmpty()) {
                     String pkg = tasks.get(0).topActivity.getPackageName();
@@ -394,20 +534,17 @@ public class FloatingService extends Service {
                     ApplicationInfo ai = pm.getApplicationInfo(pkg, 0);
                     targetUid = ai.uid;
                     targetAppName = pm.getApplicationLabel(ai).toString();
+                    
+                    tvTargetNet.setText("🎯 锁定: " + targetAppName + " [解除]");
+                    tvTargetNet.setTextColor(0xFFE67E22);
+                    lastRx = TrafficStats.getUidRxBytes(targetUid);
+                    lastTx = TrafficStats.getUidTxBytes(targetUid);
+                    return;
                 }
-            }
-            
-            if (targetUid != -1) {
-                tvTargetNet.setText("🎯 锁定: " + targetAppName + " [解除]");
-                tvTargetNet.setTextColor(0xFFE67E22);
-                lastRx = TrafficStats.getUidRxBytes(targetUid);
-                lastTx = TrafficStats.getUidTxBytes(targetUid);
-            } else {
-                Toast.makeText(this, "获取前台应用失败", Toast.LENGTH_SHORT).show();
-            }
-        } catch (Exception e) {
-            Toast.makeText(this, "需要应用使用情况访问权限", Toast.LENGTH_SHORT).show();
+            } catch (Exception e) {}
         }
+        
+        Toast.makeText(this, "物理探针抓取失败", Toast.LENGTH_SHORT).show();
     }
 
     private void setWindowFocusable(boolean focusable) {
@@ -607,13 +744,25 @@ public class FloatingService extends Service {
             if (rx == TrafficStats.UNSUPPORTED || tx == TrafficStats.UNSUPPORTED) {
                 tvNetRx.setText("下行速率: 接口受限");
                 tvNetTx.setText("上行速率: 接口受限");
+                tvNetRx.setTextColor(0xFF4E5D6A);
+                tvNetTx.setTextColor(0xFF4E5D6A);
+            } else if (targetUid != -1 && rx == 0 && tx == 0) {
+                tvNetRx.setText("下行速率: [受 eBPF 隔离致盲]");
+                tvNetTx.setText("上行速率: [受 eBPF 隔离致盲]");
+                tvNetRx.setTextColor(0xFFE74C3C);
+                tvNetTx.setTextColor(0xFFE74C3C);
             } else {
                 if (lastRx != 0 || lastTx != 0) {
                     long rxSpeed = (rx - lastRx) / 1024;
                     long txSpeed = (tx - lastTx) / 1024;
                     tvNetRx.setText("下行速率: " + Math.max(0, rxSpeed) + " KB/s");
                     tvNetTx.setText("上行速率: " + Math.max(0, txSpeed) + " KB/s");
+                } else {
+                    tvNetRx.setText("下行速率: 0 KB/s");
+                    tvNetTx.setText("上行速率: 0 KB/s");
                 }
+                tvNetRx.setTextColor(0xFF4E5D6A);
+                tvNetTx.setTextColor(0xFF4E5D6A);
                 lastRx = rx;
                 lastTx = tx;
             }
@@ -621,13 +770,13 @@ public class FloatingService extends Service {
     }
 
     private void updateWindowAlpha(int p) {
-        if (rootContainer.getBackground()!=null) rootContainer.getBackground().mutate().setAlpha(p);
-        if (llTransCard.getBackground()!=null) llTransCard.getBackground().mutate().setAlpha(p);
-        if (llShieldCard.getBackground()!=null) llShieldCard.getBackground().mutate().setAlpha(p);
-        if (llMonitorCard.getBackground()!=null) llMonitorCard.getBackground().mutate().setAlpha(p);
-        if (llCounterCard.getBackground()!=null) llCounterCard.getBackground().mutate().setAlpha(p);
-        if (etInput.getBackground()!=null) etInput.getBackground().mutate().setAlpha(p);
-        if (tvResult.getBackground()!=null) tvResult.getBackground().mutate().setAlpha(p);
+        if (rootContainer != null && rootContainer.getBackground()!=null) rootContainer.getBackground().mutate().setAlpha(p);
+        if (llTransCard != null && llTransCard.getBackground()!=null) llTransCard.getBackground().mutate().setAlpha(p);
+        if (llShieldCard != null && llShieldCard.getBackground()!=null) llShieldCard.getBackground().mutate().setAlpha(p);
+        if (llMonitorCard != null && llMonitorCard.getBackground()!=null) llMonitorCard.getBackground().mutate().setAlpha(p);
+        if (llCounterCard != null && llCounterCard.getBackground()!=null) llCounterCard.getBackground().mutate().setAlpha(p);
+        if (etInput != null && etInput.getBackground()!=null) etInput.getBackground().mutate().setAlpha(p);
+        if (tvResult != null && tvResult.getBackground()!=null) tvResult.getBackground().mutate().setAlpha(p);
     }
 
     private class TouchListener implements View.OnTouchListener {
@@ -670,49 +819,127 @@ public class FloatingService extends Service {
         });
     }
 
+    private synchronized void checkAllFailed() {
+        if (hasResult) return;
+        failedCount++;
+        if (failedCount >= 2) {
+            mainHandler.post(new Runnable() {
+                @Override public void run() {
+                    if (!hasResult) tvResult.setText("全节点竞速失败或网络超时");
+                }
+            });
+        }
+    }
+
     private void performTranslate(final String text) {
-        tvResult.setText("正在翻译...");
-        new Thread(new Runnable() {
-            @Override public void run() {
-                final String result = doTranslate(text);
-                mainHandler.post(new Runnable() {
-                    @Override public void run() {
-                        if (result != null) {
-                            tvResult.setText(result);
-                            ivCopy.setVisibility(View.VISIBLE);
-                        } else {
-                            tvResult.setText("翻译失败或接口超时");
+        tvResult.setText("引擎竞速中...");
+        hasResult = false;
+        failedCount = 0;
+        
+        synchronized(activeCalls) {
+            for (Call call : activeCalls) {
+                if (call != null && !call.isCanceled()) {
+                    call.cancel();
+                }
+            }
+            activeCalls.clear();
+        }
+
+        int sIdx = spinSrcLang != null ? spinSrcLang.getSelectedItemPosition() : 0;
+        int tIdx = spinTgtLang != null ? spinTgtLang.getSelectedItemPosition() : 1;
+        final String sLang = langCodes[sIdx];
+        final String tLang = langCodes[tIdx];
+
+        final String[] nodes = {
+            "https://deeplx.jayogo.com/translate/sk-D0TB8dagu1yxZoLrmOdenfcugyf82D14zTZoUUTRLoQFx9OJ",
+            "https://deeplx.mingming.dev/translate"
+        };
+
+        for (final String url : nodes) {
+            try {
+                JSONObject j = new JSONObject(); 
+                j.put("text", text); 
+                j.put("source_lang", sLang); 
+                j.put("target_lang", tLang);
+                
+                RequestBody body = RequestBody.create(MediaType.parse("application/json; charset=utf-8"), j.toString());
+                Request request = new Request.Builder()
+                        .url(url)
+                        .post(body)
+                        .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 13)")
+                        .build();
+
+                Call call = client.newCall(request);
+                synchronized(activeCalls) {
+                    activeCalls.add(call);
+                }
+
+                call.enqueue(new Callback() {
+                    @Override
+                    public void onFailure(Call call, IOException e) {
+                        checkAllFailed();
+                    }
+
+                    @Override
+                    public void onResponse(Call call, Response response) throws IOException {
+                        try {
+                            if (response.isSuccessful() && response.body() != null) {
+                                String resBody = response.body().string();
+                                JSONObject resObj = new JSONObject(resBody);
+                                final String data = resObj.optString("data");
+
+                                if (data != null && !data.isEmpty() && !hasResult) {
+                                    if (data.contains("linux.do") || (data.startsWith("http") && !text.startsWith("http"))) {
+                                        checkAllFailed();
+                                        return;
+                                    }
+                                    
+                                    hasResult = true;
+                                    synchronized(activeCalls) {
+                                        for (Call c : activeCalls) {
+                                            if (!c.isCanceled()) c.cancel();
+                                        }
+                                    }
+                                    mainHandler.post(new Runnable() {
+                                        @Override public void run() {
+                                            tvResult.setText(data);
+                                            if (ivCopy != null) ivCopy.setVisibility(View.VISIBLE);
+                                        }
+                                    });
+                                } else {
+                                    checkAllFailed();
+                                }
+                            } else {
+                                checkAllFailed();
+                            }
+                        } catch (Exception e) {
+                            checkAllFailed();
+                        } finally {
+                            if (response != null) {
+                                response.close();
+                            }
                         }
                     }
                 });
+            } catch (Exception e) {
+                checkAllFailed();
             }
-        }).start();
-    }
-
-    private String doTranslate(String text) {
-        try {
-            HttpURLConnection c = (HttpURLConnection) new URL("https://deeplx.jayogo.com/translate/sk-D0TB8dagu1yxZoLrmOdenfcugyf82D14zTZoUUTRLoQFx9OJ").openConnection();
-            c.setRequestMethod("POST"); c.setDoOutput(true);
-            c.setConnectTimeout(5000); c.setReadTimeout(5000);
-            c.setRequestProperty("Content-Type", "application/json");
-            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 13)");
-            JSONObject j = new JSONObject(); j.put("text", text); j.put("source_lang", "auto"); j.put("target_lang", "ZH");
-            c.getOutputStream().write(j.toString().getBytes("UTF-8"));
-            if (c.getResponseCode()==200) {
-                BufferedReader r = new BufferedReader(new InputStreamReader(c.getInputStream(), "UTF-8"));
-                StringBuilder s = new StringBuilder(); String l;
-                while((l=r.readLine())!=null) s.append(l);
-                return new JSONObject(s.toString()).optString("data");
-            }
-        } catch (Exception e) { e.printStackTrace(); }
-        return null;
+        }
     }
 
     @Override public IBinder onBind(Intent i) { return null; }
     @Override public void onDestroy() {
-        unregisterReceiver(batteryReceiver);
+        try { unregisterReceiver(batteryReceiver); } catch (Exception e) {}
         isMonitorActive = false;
         mainHandler.removeCallbacks(monitorRunnable);
+        
+        synchronized(activeCalls) {
+            for (Call call : activeCalls) {
+                if (call != null) call.cancel();
+            }
+            activeCalls.clear();
+        }
+
         if (isShieldOn && shieldView != null && shieldView.getParent() != null) {
             try { windowManager.removeView(shieldView); } catch (Exception e) {}
         }

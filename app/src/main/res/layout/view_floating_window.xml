@@ -28,6 +28,13 @@
             <TextView android:id="@+id/tv_mode_toggle" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="被动模式: ON" android:textColor="#4E5D6A" android:textSize="9sp" android:clickable="true" />
             <ImageView android:id="@+id/iv_copy_trans" android:layout_width="22dp" android:layout_height="22dp" android:layout_alignParentRight="true" android:src="@android:drawable/ic_menu_save" android:visibility="gone" />
         </RelativeLayout>
+        
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="5dp">
+            <Spinner android:id="@+id/spin_src_lang" android:layout_width="0dp" android:layout_height="35dp" android:layout_weight="1" android:background="@drawable/bg_neumorph_edit_inset" />
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text=" ➔ " android:textColor="#4E5D6A" android:layout_gravity="center_vertical" />
+            <Spinner android:id="@+id/spin_tgt_lang" android:layout_width="0dp" android:layout_height="35dp" android:layout_weight="1" android:background="@drawable/bg_neumorph_edit_inset" />
+        </LinearLayout>
+
         <EditText android:id="@+id/et_trans_input" android:layout_width="match_parent" android:layout_height="40dp" android:background="@drawable/bg_neumorph_edit_inset" android:hint="点此输入并回车..." android:paddingLeft="10dp" android:textColor="#333333" android:textSize="12sp" android:singleLine="true" android:imeOptions="actionSearch" android:inputType="text" android:shadowColor="#CC000000" android:shadowRadius="3" />
         <TextView android:id="@+id/tv_trans_result" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:layout_marginTop="5dp" android:background="@drawable/bg_neumorph_edit_inset" android:padding="8dp" android:text="等待剪贴板内容..." android:textColor="#333333" android:textSize="13sp" android:shadowColor="#CC000000" android:shadowDx="1.5" android:shadowDy="1.5" android:shadowRadius="5" />
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="5dp" android:text="窗口透明度:" android:textColor="#4E5D6A" android:textSize="9sp" />

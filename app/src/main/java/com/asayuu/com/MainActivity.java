@@ -129,7 +129,7 @@ public class MainActivity extends Activity {
                 float density = getResources().getDisplayMetrics().density;
                 
                 Button btnToLanRadar = new Button(this);
-                btnToLanRadar.setText("📡 局 域 網 聲 吶 與 微 型 服 務 器");
+                btnToLanRadar.setText("📡 局 域 网 声 呐 与 微 型 服 务 器");
                 btnToLanRadar.setBackgroundResource(R.drawable.selector_neumorph_btn);
                 btnToLanRadar.setTextColor(android.graphics.Color.parseColor("#E67E22"));
                 btnToLanRadar.setTextSize(13f);
@@ -146,9 +146,9 @@ public class MainActivity extends Activity {
                     }
                 });
 
-                // 新增注入：物理設備遙測終端
+                // 新增注入：物理设备遥测终端
                 Button btnToLogTerminal = new Button(this);
-                btnToLogTerminal.setText("📟 物 理 設 備 遙 測 終 端");
+                btnToLogTerminal.setText("📟 物 理 设 备 遥 测 终 端");
                 btnToLogTerminal.setBackgroundResource(R.drawable.selector_neumorph_btn);
                 btnToLogTerminal.setTextColor(android.graphics.Color.parseColor("#8E44AD"));
                 btnToLogTerminal.setTextSize(13f);

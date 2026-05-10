@@ -10,6 +10,7 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -17,6 +18,7 @@ import android.os.Environment;
 import android.os.AsyncTask;
 import android.view.Gravity;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.AdapterView;
@@ -102,38 +104,121 @@ public class SafeBoxActivity extends Activity {
             }
         });
 
-        adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, fileNames);
+        // 物理渲染器拦截：强制覆盖主列表底层文字为深色，防止背景融合
+        adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, fileNames) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                if (view instanceof TextView) {
+                    ((TextView) view).setTextColor(Color.parseColor("#333333"));
+                }
+                return view;
+            }
+        };
         lvVaultFiles.setAdapter(adapter);
         
         lvVaultFiles.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                handleFileClick(currentFiles.get(position));
+                showFileOperationMatrix(currentFiles.get(position));
             }
         });
 
         lvVaultFiles.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
-            @Override public boolean onItemLongClick(AdapterView<?> parent, View view, final int position, long id) {
-                new AlertDialog.Builder(SafeBoxActivity.this)
-                    .setTitle("删除确认")
-                    .setMessage("确定要永久销毁此文件吗？")
-                    .setPositiveButton("销毁", new DialogInterface.OnClickListener() {
-                        @Override public void onClick(DialogInterface dialog, int which) {
-                            currentFiles.get(position).delete();
-                            loadFiles();
-                        }
-                    }).setNegativeButton("取消", null).show();
+            @Override public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
+                showFileOperationMatrix(currentFiles.get(position));
                 return true;
             }
         });
 
         checkAndRequestPermissions();
+        injectExportManagerButton();
+    }
+
+    private void injectExportManagerButton() {
+        try {
+            LinearLayout vaultPanel = (LinearLayout) findViewById(R.id.ll_vault);
+            View anchorView = findViewById(R.id.btn_import_file);
+            ViewGroup parent = (ViewGroup) anchorView.getParent();
+            
+            float density = getResources().getDisplayMetrics().density;
+            Button btnManageExport = new Button(this);
+            btnManageExport.setText("🗑️ 管理物理导出舱 (选择性删除)");
+            btnManageExport.setBackgroundResource(R.drawable.selector_neumorph_btn);
+            btnManageExport.setTextColor(Color.parseColor("#E74C3C")); 
+            btnManageExport.setTextSize(12f);
+            
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, (int)(50 * density));
+            lp.topMargin = (int)(15 * density);
+            
+            int index = vaultPanel.indexOfChild(lvVaultFiles.getParent() instanceof ScrollView ? (View)lvVaultFiles.getParent() : lvVaultFiles);
+            vaultPanel.addView(btnManageExport, index, lp);
+            
+            btnManageExport.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { showExportManagerDialog(); }
+            });
+        } catch (Exception e) {}
+    }
+
+    private void showExportManagerDialog() {
+        final File exportDir = new File(Environment.getExternalStorageDirectory(), "Download/XiaoyuExport");
+        if (!exportDir.exists() || exportDir.listFiles() == null || exportDir.listFiles().length == 0) {
+            Toast.makeText(this, "物理导出舱当前为空，无需清理。", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        final List<File> exportFiles = new ArrayList<File>();
+        final List<String> exportNames = new ArrayList<String>();
+        for (File f : exportDir.listFiles()) {
+            if (f.isFile()) {
+                exportFiles.add(f);
+                exportNames.add(f.getName() + " (" + (f.length() / 1024) + " KB)");
+            }
+        }
+
+        // 物理渲染器拦截：彻底修复对话框内的白底白字冲突，强制注入黑色素
+        final ArrayAdapter<String> exportAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, exportNames) {
+            @Override
+            public View getView(int position, View convertView, ViewGroup parent) {
+                View view = super.getView(position, convertView, parent);
+                if (view instanceof TextView) {
+                    ((TextView) view).setTextColor(Color.parseColor("#000000")); // 强制极黑，抗干扰
+                }
+                return view;
+            }
+        };
+        
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("物理舱管理器 (明文曝光区)");
+        builder.setAdapter(exportAdapter, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, final int which) {
+                new AlertDialog.Builder(SafeBoxActivity.this)
+                    .setTitle("单点销毁确认")
+                    .setMessage("确定要从物理导出舱中永久抹除此明文文件吗？\n文件: " + exportFiles.get(which).getName())
+                    .setPositiveButton("立刻抹除", new DialogInterface.OnClickListener() {
+                        @Override public void onClick(DialogInterface d, int w) {
+                            exportFiles.get(which).delete();
+                            Toast.makeText(SafeBoxActivity.this, "已销毁明文快照", Toast.LENGTH_SHORT).show();
+                            showExportManagerDialog(); 
+                        }
+                    }).setNegativeButton("保留", null).show();
+            }
+        });
+        builder.setNeutralButton("一键排空 (最高权限)", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                for (File f : exportFiles) f.delete();
+                Toast.makeText(SafeBoxActivity.this, "物理导出舱已全域排空", Toast.LENGTH_SHORT).show();
+            }
+        });
+        builder.setNegativeButton("关闭", null);
+        builder.show();
     }
 
     private void checkAndRequestPermissions() {
         if (Build.VERSION.SDK_INT >= 30) {
             boolean hasPermission = false;
             try {
-                // 物理级 I/O 探针测试，彻底取代高版本 API 反射，绕过编译器检查
                 File testFile = new File(Environment.getExternalStorageDirectory(), ".safebox_test");
                 if (testFile.exists()) testFile.delete();
                 hasPermission = testFile.createNewFile();
@@ -214,16 +299,82 @@ public class SafeBoxActivity extends Activity {
     private void loadFiles() {
         fileNames.clear();
         currentFiles.clear();
-        if (currentVaultDir != null && currentVaultDir.exists()) {
-            File[] files = currentVaultDir.listFiles();
+        
+        File baseDir = new File(Environment.getExternalStorageDirectory(), "Download/.XiaoyuVault");
+
+        loadDirectory(currentVaultDir, "[暗盒]");
+        loadDirectory(new File(baseDir, "WebDrop"), "[Web推送]");
+        loadDirectory(new File(baseDir, "Video"), "[视频流]");
+        loadDirectory(new File(baseDir, "Agent"), "[终端]");
+        loadDirectory(new File(baseDir, "AgentBackground"), "[后台]");
+
+        adapter.notifyDataSetChanged();
+    }
+
+    private void loadDirectory(File dir, String tag) {
+        if (dir != null && dir.exists()) {
+            File[] files = dir.listFiles();
             if (files != null) {
                 for (File f : files) {
-                    currentFiles.add(f);
-                    fileNames.add(f.getName().endsWith(".snt") ? "📝 " + f.getName().replace(".snt", "") : "📁 " + f.getName());
+                    if (f.isFile()) {
+                        currentFiles.add(f);
+                        String displayName = f.getName().endsWith(".snt") ? "📝 " + f.getName().replace(".snt", "") : "📁 " + f.getName();
+                        fileNames.add(tag + " " + displayName);
+                    }
                 }
             }
         }
-        adapter.notifyDataSetChanged();
+    }
+
+    private void showFileOperationMatrix(final File file) {
+        String[] options = {
+            "👁️ 解密并阅读 (尝试按纯文本解析)", 
+            "📤 解密并导出至物理舱 (供Web端下载)", 
+            "🗑️ 彻底物理销毁"
+        };
+        
+        new AlertDialog.Builder(this)
+            .setTitle("控制矩阵: " + file.getName())
+            .setItems(options, new DialogInterface.OnClickListener() {
+                @Override
+                public void onClick(DialogInterface dialog, int which) {
+                    if (which == 0) {
+                        try {
+                            byte[] data = decryptFileToBytes(file, currentPassword);
+                            showNoteContentDialog(file.getName().replace(".snt", ""), new String(data, "UTF-8"));
+                        } catch (Exception e) {
+                            Toast.makeText(SafeBoxActivity.this, "❌ 解密失败或文件非纯文本流结构", Toast.LENGTH_LONG).show();
+                        }
+                    } else if (which == 1) {
+                        File exportDir = new File(Environment.getExternalStorageDirectory(), "Download/XiaoyuExport");
+                        if (!exportDir.exists()) exportDir.mkdirs();
+                        
+                        String exportName = file.getName();
+                        if (exportName.endsWith(".snt")) {
+                            String parentName = file.getParentFile().getName();
+                            if ("WebDrop".equals(parentName) || "Video".equals(parentName)) {
+                                exportName = exportName.substring(0, exportName.length() - 4); 
+                            } else {
+                                exportName = exportName.replace(".snt", ".txt"); 
+                            }
+                        }
+                        
+                        File exportedFile = new File(exportDir, exportName);
+                        executeExportTask(file, exportedFile);
+                    } else if (which == 2) {
+                        new AlertDialog.Builder(SafeBoxActivity.this)
+                            .setTitle("最高警告")
+                            .setMessage("确定要动用物理碎纸机将扇区数据彻底清零吗？该操作不可逆！")
+                            .setPositiveButton("销毁", new DialogInterface.OnClickListener() {
+                                @Override public void onClick(DialogInterface d, int w) {
+                                    file.delete();
+                                    loadFiles();
+                                    Toast.makeText(SafeBoxActivity.this, "已物理销毁", Toast.LENGTH_SHORT).show();
+                                }
+                            }).setNegativeButton("取消", null).show();
+                    }
+                }
+            }).show();
     }
 
     private Dialog createLoadingDialog(Context context, String msg) {
@@ -312,34 +463,11 @@ public class SafeBoxActivity extends Activity {
         resizeDialog(dialog);
     }
 
-    private void handleFileClick(final File file) {
-        if (file.getName().endsWith(".snt")) {
-            try {
-                byte[] data = decryptFileToBytes(file, currentPassword);
-                showNoteContentDialog(file.getName().replace(".snt", ""), new String(data, "UTF-8"));
-            } catch (Exception e) {
-                Toast.makeText(this, "解密失败或密钥不匹配", Toast.LENGTH_SHORT).show();
-            }
-        } else {
-            new AlertDialog.Builder(this)
-                .setTitle("导出文件")
-                .setMessage("是否将此文件解密并导出至 Download/XiaoyuExport 目录？")
-                .setPositiveButton("导出", new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface dialog, int which) {
-                        File exportDir = new File(Environment.getExternalStorageDirectory(), "Download/XiaoyuExport");
-                        if (!exportDir.exists()) exportDir.mkdirs();
-                        File exportedFile = new File(exportDir, file.getName());
-                        executeExportTask(file, exportedFile);
-                    }
-                }).setNegativeButton("取消", null).show();
-        }
-    }
-
     private void executeExportTask(final File inFile, final File outFile) {
         new AsyncTask<Void, Void, Boolean>() {
             Dialog loadingDialog;
             @Override protected void onPreExecute() {
-                loadingDialog = createLoadingDialog(SafeBoxActivity.this, "AES 流式解密導出中, 請勿操作...");
+                loadingDialog = createLoadingDialog(SafeBoxActivity.this, "AES 密钥路由穿透解密中...");
                 loadingDialog.show();
             }
             @Override protected Boolean doInBackground(Void... voids) {
@@ -353,9 +481,9 @@ public class SafeBoxActivity extends Activity {
             @Override protected void onPostExecute(Boolean success) {
                 if (loadingDialog != null && loadingDialog.isShowing()) loadingDialog.dismiss();
                 if (success) {
-                    Toast.makeText(SafeBoxActivity.this, "导出成功: " + outFile.getAbsolutePath(), Toast.LENGTH_LONG).show();
+                    Toast.makeText(SafeBoxActivity.this, "导出成功! 请前往 Web 控制台查看。", Toast.LENGTH_LONG).show();
                 } else {
-                    Toast.makeText(SafeBoxActivity.this, "导出失败", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(SafeBoxActivity.this, "导出失败: 数据已粉碎或发生密钥墙碰撞", Toast.LENGTH_SHORT).show();
                 }
             }
         }.execute();
@@ -483,8 +611,6 @@ public class SafeBoxActivity extends Activity {
         }.execute();
     }
 
-    // --- 底层加密引擎 ---
-    
     private String getSHA256(String str) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] hash = digest.digest(str.getBytes("UTF-8"));
@@ -501,6 +627,27 @@ public class SafeBoxActivity extends Activity {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         byte[] key = digest.digest(password.getBytes("UTF-8"));
         return new SecretKeySpec(key, "AES");
+    }
+
+    private SecretKeySpec getSystemMasterKey(String saltSuffix) throws Exception {
+        String deviceId = android.provider.Settings.Secure.getString(getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
+        if (deviceId == null) deviceId = "xiaoyu_fallback_id";
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        byte[] key = digest.digest((deviceId + saltSuffix).getBytes("UTF-8"));
+        return new SecretKeySpec(key, "AES");
+    }
+
+    private SecretKeySpec getSecretKeyForFile(File file, String userPassword) throws Exception {
+        String parentName = file.getParentFile().getName();
+        if ("WebDrop".equals(parentName)) {
+            return getSystemMasterKey("_xiaoyu_blind_drop");
+        } else if ("Video".equals(parentName)) {
+            return getSystemMasterKey("_xiaoyu_video_master_key");
+        } else if ("Agent".equals(parentName) || "AgentBackground".equals(parentName)) {
+            return getSystemMasterKey("_xiaoyu_agent_master_key");
+        } else {
+            return generateAESKey(userPassword);
+        }
     }
 
     private void encryptBytesToFile(byte[] data, File outFile, String password) throws Exception {
@@ -545,7 +692,7 @@ public class SafeBoxActivity extends Activity {
         FileInputStream fis = new FileInputStream(inFile);
         byte[] iv = new byte[16];
         fis.read(iv);
-        SecretKeySpec key = generateAESKey(password);
+        SecretKeySpec key = getSecretKeyForFile(inFile, password);
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(iv));
 
@@ -564,7 +711,7 @@ public class SafeBoxActivity extends Activity {
         FileInputStream fis = new FileInputStream(inFile);
         byte[] iv = new byte[16];
         fis.read(iv);
-        SecretKeySpec key = generateAESKey(password);
+        SecretKeySpec key = getSecretKeyForFile(inFile, password);
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
         cipher.init(Cipher.DECRYPT_MODE, key, new IvParameterSpec(iv));
 

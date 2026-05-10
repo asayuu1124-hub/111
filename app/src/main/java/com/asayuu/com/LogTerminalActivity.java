@@ -44,7 +44,7 @@ public class LogTerminalActivity extends Activity {
         root.setBackgroundColor(Color.parseColor("#121212"));
 
         TextView title = new TextView(this);
-        title.setText("📟 物理設備遙測與日誌裝甲 (PID: " + myPid + ")");
+        title.setText("📟 物理设备遥测与日志装甲 (PID: " + myPid + ")");
         title.setTextColor(Color.parseColor("#00FF00"));
         title.setGravity(Gravity.CENTER);
         title.setPadding(20, 40, 20, 20);
@@ -65,7 +65,7 @@ public class LogTerminalActivity extends Activity {
         controlPanel.addView(btnClear, lpBtn);
 
         Button btnDump = new Button(this);
-        btnDump.setText("快 照 落 盤");
+        btnDump.setText("快 照 落 盘");
         btnDump.setTextColor(Color.WHITE);
         btnDump.setBackgroundColor(Color.parseColor("#333333"));
         LinearLayout.LayoutParams lpBtn2 = new LinearLayout.LayoutParams(0, -2, 1.0f);
@@ -152,9 +152,9 @@ public class LogTerminalActivity extends Activity {
                 fos.write((seq.toString() + "\n").getBytes("UTF-8"));
             }
             fos.close();
-            Toast.makeText(this, "物理快照已匯出: " + file.getAbsolutePath(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "物理快照已汇出: " + file.getAbsolutePath(), Toast.LENGTH_LONG).show();
         } catch (Exception e) {
-            Toast.makeText(this, "匯出失敗: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "汇出失败: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 
